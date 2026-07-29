@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { UserRole } from '../../types/supabase';
-import { User, Palette, Eye, EyeOff } from 'lucide-react';
+import { User, Palette, Eye, EyeOff, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
 export default function Signup() {
@@ -23,11 +23,18 @@ export default function Signup() {
     setLoading(true);
 
     const { error: signUpError } = await signUp(email, password, role, username || undefined);
+    
     if (signUpError) {
       setError(signUpError.message);
       setLoading(false);
+      return;
+    }
+
+    // Success
+    if (role === 'designer') {
+      navigate('/designer/onboarding', { replace: true });
     } else {
-      navigate(role === 'designer' ? '/designer/onboarding' : '/feed', { replace: true });
+      navigate('/feed', { replace: true });
     }
   };
 
@@ -36,108 +43,144 @@ export default function Signup() {
       <Helmet>
         <title>Join — Drapé Collective</title>
       </Helmet>
-      <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
-            <Link to="/" className="font-heading text-3xl font-bold text-primary">Drapé</Link>
-            <h1 className="font-heading text-2xl font-bold text-foreground mt-4">Join Drapé Collective</h1>
-            <p className="text-foreground/60 mt-1 text-sm">Create your account</p>
+
+      <div className="min-h-[85vh] flex items-center justify-center px-4 py-16">
+        <div className="w-full max-w-[400px]">
+          {/* Brand */}
+          <div className="text-center mb-10">
+            <Link
+              to="/"
+              className="inline-block font-serif text-3xl font-medium tracking-tight text-charcoal-800"
+            >
+              Drapé
+            </Link>
+            <h1 className="font-serif text-2xl font-medium text-charcoal-800 mt-6">
+              Join the Collective
+            </h1>
+            <p className="text-sm text-charcoal-400 mt-2">
+              Create your account
+            </p>
           </div>
 
           {step === 'role' ? (
             <div className="space-y-4">
-              <p className="text-sm font-medium text-foreground/80 text-center">I want to join as a...</p>
+              <p className="text-sm font-medium text-charcoal-600 text-center mb-2">
+                I want to join as a…
+              </p>
+
+              {/* CUSTOMER OPTION */}
               <button
-                onClick={() => { setRole('customer'); setStep('details'); }}
-                className="w-full p-4 rounded-xl border-2 border-border hover:border-primary/40 hover:bg-primary/5 transition-all text-left cursor-pointer"
+                type="button"
+                onClick={() => {
+                  setRole('customer');
+                  setStep('details');
+                }}
+                className="w-full p-5 rounded-2xl border border-border bg-white hover:border-charcoal-400 hover:shadow-sm transition-all text-left"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <User size={20} className="text-primary" />
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-xl bg-ivory-100 flex items-center justify-center">
+                    <User size={20} className="text-charcoal-600" />
                   </div>
                   <div>
-                    <p className="font-semibold text-foreground">Customer</p>
-                    <p className="text-xs text-foreground/50">Discover and shop unique pieces</p>
+                    <p className="font-medium text-charcoal-800">Customer / Buyer</p>
+                    <p className="text-xs text-charcoal-400 mt-0.5">
+                      Discover and collect unique pieces
+                    </p>
                   </div>
                 </div>
               </button>
+
+              {/* DESIGNER OPTION */}
               <button
-                onClick={() => { setRole('designer'); setStep('details'); }}
-                className="w-full p-4 rounded-xl border-2 border-border hover:border-secondary/40 hover:bg-secondary/5 transition-all text-left cursor-pointer"
+                type="button"
+                onClick={() => {
+                  setRole('designer');
+                  setStep('details');
+                }}
+                className="w-full p-5 rounded-2xl border border-border bg-white hover:border-charcoal-400 hover:shadow-sm transition-all text-left"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
-                    <Palette size={20} className="text-secondary" />
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-xl bg-ivory-100 flex items-center justify-center">
+                    <Palette size={20} className="text-charcoal-600" />
                   </div>
                   <div>
-                    <p className="font-semibold text-foreground">Designer</p>
-                    <p className="text-xs text-foreground/50">Showcase and sell your collections</p>
+                    <p className="font-medium text-charcoal-800">Designer</p>
+                    <p className="text-xs text-charcoal-400 mt-0.5">
+                      Showcase and sell your collections
+                    </p>
                   </div>
                 </div>
               </button>
-              <p className="text-center text-xs text-foreground/40 mt-4">
-                Already have an account? <Link to="/login" className="text-primary font-medium hover:underline">Sign in</Link>
+
+              <p className="text-center text-sm text-charcoal-400 mt-8">
+                Already have an account?{' '}
+                <Link to="/login" className="text-charcoal-700 font-medium hover:underline">
+                  Sign in
+                </Link>
               </p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="flex items-center gap-3 mb-1">
                 <button
                   type="button"
                   onClick={() => setStep('role')}
-                  className="text-sm text-foreground/50 hover:text-foreground transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 text-sm text-charcoal-400 hover:text-charcoal-600"
                 >
-                  &larr; Back
+                  <ArrowLeft size={15} />
+                  Back
                 </button>
-                <span className="text-xs text-foreground/30">|</span>
-                <span className="text-xs text-foreground/50 capitalize">
-                  Joining as <span className="font-medium text-primary">{role}</span>
+                <span className="text-charcoal-200">|</span>
+                <span className="text-xs text-charcoal-500">
+                  Joining as <strong className="text-charcoal-700 capitalize">{role === 'customer' ? 'Customer' : 'Designer'}</strong>
                 </span>
               </div>
 
               <div>
-                <label htmlFor="username" className="block text-sm font-medium text-foreground/80 mb-1.5">Username</label>
+                <label className="block text-sm font-medium text-charcoal-700 mb-1.5">
+                  Username
+                </label>
                 <input
-                  id="username"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="yourname"
-                  className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                  className="w-full px-4 py-3.5 bg-white border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-300/40 focus:border-gold-400"
                 />
               </div>
 
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-foreground/80 mb-1.5">Email</label>
+                <label className="block text-sm font-medium text-charcoal-700 mb-1.5">
+                  Email
+                </label>
                 <input
-                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
-                  className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                  className="w-full px-4 py-3.5 bg-white border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-300/40 focus:border-gold-400"
                 />
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-foreground/80 mb-1.5">Password</label>
+                <label className="block text-sm font-medium text-charcoal-700 mb-1.5">
+                  Password
+                </label>
                 <div className="relative">
                   <input
-                    id="password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
                     minLength={6}
-                    className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all pr-10"
+                    className="w-full px-4 py-3.5 bg-white border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-300/40 focus:border-gold-400 pr-12"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground/60 cursor-pointer"
-                    tabIndex={-1}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-charcoal-400"
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -145,15 +188,18 @@ export default function Signup() {
               </div>
 
               {error && (
-                <p className="text-destructive text-sm bg-destructive/5 px-3 py-2 rounded-lg">{error}</p>
+                <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-100 text-sm text-red-600">
+                  {error}
+                </div>
               )}
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-on-primary font-medium rounded-xl hover:opacity-90 transition-all disabled:opacity-50 cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-3.5 bg-charcoal-700 text-white rounded-xl text-sm font-medium hover:bg-charcoal-800 disabled:opacity-50"
               >
-                {loading ? 'Creating account...' : `Create ${role} account`}
+                {loading ? 'Creating account…' : `Create ${role === 'customer' ? 'Customer' : 'Designer'} account`}
+                {!loading && <ArrowRight size={16} />}
               </button>
             </form>
           )}

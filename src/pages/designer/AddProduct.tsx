@@ -1,14 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
-import type { Product } from '../../types/supabase';
-import { X, Save, Image as ImageIcon, ArrowLeft, ArrowRight, AlertTriangle } from 'lucide-react';
+import { X, ImagePlus, ChevronDown, ChevronUp, ArrowLeft, Loader2 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { compressImage } from '../../lib/compressImage';
 
-const categories = ['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Accessories', 'Footwear', 'Streetwear', 'Sustainable'];
+const CATEGORIES = [
+  'Ready-to-Wear',
+  'Outerwear',
+  'Accessories',
+  'Knitwear',
+  'Evening',
+  'Avant-Garde',
+  'Denim',
+  'Other',
+];
 
 type FormData = {
   name: string;
@@ -42,10 +50,7 @@ export default function AddProduct() {
   const editId = searchParams.get('id');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { formatPrice } = useCurrency();
-  const [step, setStep] = useState(1);
-  const [stepError, setStepError] = useState<string | null>(null);
 
-  /* ─── Form data ─── */
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -53,10 +58,8 @@ export default function AddProduct() {
   const [saving, setSaving] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    console.log('[AddProduct] Mounting component with User ID:', userId, 'Edit ID:', editId);
-  }, [userId, editId]);
+  const [showMore, setShowMore] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
     if (editId) loadProduct(editId);
@@ -80,12 +83,24 @@ export default function AddProduct() {
     }
   }
 
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    const newImages = [...images, ...files];
-    setImages(newImages);
-    const previews = files.map((f) => URL.createObjectURL(f));
+  const addFiles = useCallback((files: FileList | File[]) => {
+    const fileArray = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (fileArray.length === 0) return;
+
+    setImages((prev) => [...prev, ...fileArray]);
+    const previews = fileArray.map((f) => URL.createObjectURL(f));
     setImagePreviews((prev) => [...prev, ...previews]);
+  }, []);
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.files) addFiles(e.target.files);
+    e.target.value = '';
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files) addFiles(e.dataTransfer.files);
   }
 
   function removeImage(index: number) {
@@ -98,133 +113,85 @@ export default function AddProduct() {
     setExistingImages((prev) => prev.filter((u) => u !== url));
   }
 
-  /* ─── Step navigation ─── */
-  const goToNextStep = useCallback(() => {
-    setStepError(null);
+  const totalImages = existingImages.length + images.length;
+  const canPublish = form.name.trim() && form.price && totalImages > 0;
 
-    if (step === 1) {
-      // Validate required fields before advancing
-      if (!form.name.trim()) {
-        setStepError('Please enter a product name before continuing.');
-        return;
-      }
-    }
-
-    try {
-      const nextStep = step + 1;
-      console.log('[AddProduct] Advancing to step:', nextStep);
-      setStep(nextStep);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load the photo step.';
-      console.error('[AddProduct] Step transition error:', err);
-      setStepError('Could not advance to the photo upload screen: ' + msg);
-    }
-  }, [step, form.name]);
-
-  const goToPrevStep = useCallback(() => {
-    setStepError(null);
-    setStep((s) => Math.max(1, s - 1));
-  }, []);
-
-  /* ─── Submit ─── */
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!userId) {
       setError('Authentication lost. Please sign in again.');
       return;
     }
-    if (!form.name) {
-      setError('Product name is required.');
+    if (!form.name.trim()) {
+      setError('Please give your piece a name.');
+      return;
+    }
+    if (totalImages === 0) {
+      setError('Please add at least one photo.');
+      return;
+    }
+    if (!form.price) {
+      setError('Please set a price.');
       return;
     }
 
-    // Early role check — surface a clear message if the user isn't a designer
     if (profile && profile.role !== 'designer' && profile.role !== 'admin') {
-      setError(
-        'Your account is not set up as a designer. Please complete the designer onboarding or contact support to enable design uploads.'
-      );
+      setError('Your account is not set up as a designer. Please complete onboarding first.');
       return;
     }
 
     setError(null);
     setOptimizing(true);
+
     try {
       let imageUrls = [...existingImages];
       const uploadErrors: string[] = [];
 
-      // ── Phase 1: Compress all images in-browser ──
+      // Compress
       const compressedFiles: { file: File; name: string }[] = [];
       for (const file of images) {
         try {
           const result = await compressImage(file);
           compressedFiles.push({ file: result.file, name: file.name });
-          console.log(
-            '[AddProduct] Compressed', file.name,
-            result.originalSize, '→', result.compressedSize, 'bytes (quality', result.qualityUsed, ')'
-          );
         } catch (compressErr) {
           const msg = compressErr instanceof Error ? compressErr.message : 'Compression failed';
           uploadErrors.push(`${file.name}: ${msg}`);
         }
       }
 
-      // ── Phase 2: Upload compressed images ──
       setOptimizing(false);
       setSaving(true);
 
+      // Upload
       for (const { file, name } of compressedFiles) {
         try {
-          // Sanitise filename
           const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
-          const cleanBase = name
-            .replace(/\.[^/.]+$/, '')
-            .replace(/[^a-zA-Z0-9_-]/g, '-')
-            .replace(/-+/g, '-')
-            .replace(/^-|-$/g, '')
-            .toLowerCase()
-            .slice(0, 60);
-
           const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
 
           const { error: uploadError } = await supabase.storage
             .from('products')
-            .upload(path, file, {
-              cacheControl: '3600',
-              upsert: false,
-            });
+            .upload(path, file, { cacheControl: '3600', upsert: false });
 
           if (uploadError) {
-            console.error('[AddProduct] upload error:', uploadError);
-            uploadErrors.push(`${cleanBase}: ${uploadError.message}`);
+            uploadErrors.push(`${name}: ${uploadError.message}`);
             continue;
           }
 
-          const { data: { publicUrl } } = supabase.storage
-            .from('products')
-            .getPublicUrl(path);
+          const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(path);
           imageUrls.push(publicUrl);
         } catch (perFileErr) {
           const msg = perFileErr instanceof Error ? perFileErr.message : 'Unknown error';
-          console.error('[AddProduct] per-file error:', perFileErr);
           uploadErrors.push(`${name}: ${msg}`);
         }
       }
 
-      // Surface upload errors gracefully
       if (uploadErrors.length > 0 && imageUrls.length === 0) {
-        throw new Error(
-          `Image upload failed. ${uploadErrors.slice(0, 3).join('; ')}${uploadErrors.length > 3 ? ` (+${uploadErrors.length - 3} more)` : ''}`
-        );
+        throw new Error(`Image upload failed. ${uploadErrors.slice(0, 2).join('; ')}`);
       }
-      if (uploadErrors.length > 0) {
-        console.warn('[AddProduct] partial upload failure:', uploadErrors);
-        setError(
-          `${imageUrls.length} of ${images.length} images uploaded. Issues: ${uploadErrors.slice(0, 2).join('; ')}`
-        );
-      }
+
       const productData = {
         user_id: profile?.id || userId,
-        name: form.name,
+        name: form.name.trim(),
         description: form.description || null,
         category: form.category || null,
         price: form.price ? parseFloat(form.price) : null,
@@ -240,31 +207,21 @@ export default function AddProduct() {
         tags: form.tags
           ? form.tags.split(',').map((s) => s.trim()).filter(Boolean)
           : [],
-        status: 'published', // Instant publish — no moderation queue
+        status: 'published',
         is_hidden: false,
       };
 
       if (editId) {
-        console.log('[AddProduct] Updating product:', editId, 'with data:', JSON.stringify(productData));
-        const { error: updateError, data: updatedData } = await supabase
+        const { error: updateError } = await supabase
           .from('products')
           .update(productData)
-          .eq('id', editId)
-          .select();
-
-        if (updateError) {
-          console.error('[AddProduct] Update error:', updateError);
-          throw new Error(`Update failed: ${updateError.message}`);
-        }
-        console.log('[AddProduct] Update successful:', updatedData);
+          .eq('id', editId);
+        if (updateError) throw new Error(updateError.message);
       } else {
         const { error: insertError } = await supabase.from('products').insert(productData);
-        if (insertError) {
-          console.error('[AddProduct] Insert error:', insertError);
-          throw new Error(`Insert failed: ${insertError.message}`);
-        }
+        if (insertError) throw new Error(insertError.message);
       }
-      console.log('[AddProduct] Product saved. Redirecting to /designer/products');
+
       navigate('/designer/products');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save product');
@@ -277,236 +234,65 @@ export default function AddProduct() {
   return (
     <>
       <Helmet>
-        <title>{editId ? 'Edit' : 'Add'} Product — Drapé Collective</title>
+        <title>{editId ? 'Edit Piece' : 'New Piece'} — Drapé Collective</title>
       </Helmet>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* ─── Step indicator ─── */}
-        <div className="flex items-center gap-2 mb-8">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className="flex items-center gap-2">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                  s === step
-                    ? 'bg-primary text-on-primary'
-                    : s < step
-                    ? 'bg-primary/30 text-on-primary'
-                    : 'bg-muted text-foreground/40'
-                }`}
-              >
-                {s < step ? '✓' : s}
-              </div>
-              <span className={`text-xs font-medium hidden sm:inline ${s === step ? 'text-foreground' : 'text-foreground/40'}`}>
-                {s === 1 ? 'Details' : s === 2 ? 'Photos' : 'Review'}
-              </span>
-              {s < 3 && <div className="w-6 h-px bg-border" />}
-            </div>
-          ))}
-        </div>
 
-        <h1 className="font-heading text-3xl font-bold text-foreground mb-8">
-          {editId ? 'Edit Product' : 'Add New Product'}
-        </h1>
-
-        {/* ─── Step error banner ─── */}
-        {stepError && (
-          <div className="mb-6 p-4 rounded-xl bg-destructive/5 border border-destructive/20 flex items-start gap-3">
-            <AlertTriangle size={18} className="text-destructive shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-destructive">Navigation Error</p>
-              <p className="text-xs text-destructive/80 mt-0.5">{stepError}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setStepError(null)}
-              className="ml-auto text-destructive/50 hover:text-destructive cursor-pointer"
+      <div className="min-h-screen bg-bg">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+          {/* Header */}
+          <div className="flex items-center gap-4 mb-10">
+            <Link
+              to="/designer/products"
+              className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-charcoal-400 hover:text-charcoal-700 hover:border-charcoal-300 transition-all"
             >
-              <X size={16} />
-            </button>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* ════════════════════════════════════════ */}
-          {/* STEP 1: Details */}
-          {/* ════════════════════════════════════════ */}
-          {step === 1 && (
-            <div className="space-y-6">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-foreground/80 mb-1.5">
-                  Product Name <span className="text-destructive">*</span>
-                </label>
-                <input
-                  id="name"
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  required
-                  className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-foreground/80 mb-1.5">
-                  Description
-                </label>
-                <textarea
-                  id="description"
-                  rows={4}
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="category" className="block text-sm font-medium text-foreground/80 mb-1.5">
-                    Category
-                  </label>
-                  <select
-                    id="category"
-                    value={form.category}
-                    onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                    className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  >
-                    <option value="">Select category</option>
-                    {categories.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="price" className="block text-sm font-medium text-foreground/80 mb-1.5">
-                    Price
-                  </label>
-                  <input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={form.price}
-                    onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                    className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="materials" className="block text-sm font-medium text-foreground/80 mb-1.5">
-                    Materials (comma separated)
-                  </label>
-                  <input
-                    id="materials"
-                    type="text"
-                    value={form.materials}
-                    onChange={(e) => setForm((f) => ({ ...f, materials: e.target.value }))}
-                    placeholder="Cotton, Linen, Silk"
-                    className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="sizes" className="block text-sm font-medium text-foreground/80 mb-1.5">
-                    Sizes (comma separated)
-                  </label>
-                  <input
-                    id="sizes"
-                    type="text"
-                    value={form.sizes}
-                    onChange={(e) => setForm((f) => ({ ...f, sizes: e.target.value }))}
-                    placeholder="XS, S, M, L"
-                    className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="artistic_statement" className="block text-sm font-medium text-foreground/80 mb-1.5">
-                  Artistic Statement
-                </label>
-                <textarea
-                  id="artistic_statement"
-                  rows={3}
-                  value={form.artistic_statement}
-                  onChange={(e) => setForm((f) => ({ ...f, artistic_statement: e.target.value }))}
-                  className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                  placeholder="Tell the story behind this piece..."
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="lead_time" className="block text-sm font-medium text-foreground/80 mb-1.5">
-                    Lead Time
-                  </label>
-                  <input
-                    id="lead_time"
-                    type="text"
-                    value={form.lead_time}
-                    onChange={(e) => setForm((f) => ({ ...f, lead_time: e.target.value }))}
-                    placeholder="2-3 weeks"
-                    className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="tags" className="block text-sm font-medium text-foreground/80 mb-1.5">
-                    Tags (comma separated)
-                  </label>
-                  <input
-                    id="tags"
-                    type="text"
-                    value={form.tags}
-                    onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
-                    placeholder="sustainable, streetwear"
-                    className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                </div>
-              </div>
+              <ArrowLeft size={18} />
+            </Link>
+            <div>
+              <h1 className="font-serif text-2xl sm:text-3xl font-medium text-charcoal-800">
+                {editId ? 'Edit Piece' : 'New Piece'}
+              </h1>
+              <p className="text-sm text-charcoal-400 mt-0.5">
+                {editId ? 'Update your design' : 'Share something beautiful'}
+              </p>
             </div>
-          )}
+          </div>
 
-          {/* ════════════════════════════════════════ */}
-          {/* STEP 2: Photos */}
-          {/* ════════════════════════════════════════ */}
-          {step === 2 && (
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-foreground/80 mb-2">Product Images</label>
-                <div className="grid grid-cols-4 gap-3">
-                  {existingImages.map((url, i) => (
-                    <div key={`existing-${i}`} className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted group">
-                      <img src={url} alt="" className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removeExistingImage(url)}
-                        className="absolute top-1 right-1 p-1 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
-                  {imagePreviews.map((preview, i) => (
-                    <div key={`new-${i}`} className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted group">
-                      <img src={preview} alt="" className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(i)}
-                        className="absolute top-1 right-1 p-1 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="aspect-[3/4] rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer"
-                  >
-                    <ImageIcon size={20} className="text-foreground/30" />
-                    <span className="text-xs text-foreground/30">Add Image</span>
-                  </button>
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* ─── PHOTOS (Primary) ─── */}
+            <section>
+              <div className="flex items-baseline justify-between mb-3">
+                <label className="text-sm font-medium text-charcoal-700">
+                  Photos <span className="text-gold-500">*</span>
+                </label>
+                <span className="text-xs text-charcoal-400">
+                  {totalImages} {totalImages === 1 ? 'photo' : 'photos'}
+                </span>
+              </div>
+
+              {/* Drop zone */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`relative border-2 border-dashed rounded-2xl transition-all cursor-pointer ${
+                  dragOver
+                    ? 'border-gold-400 bg-gold-50/50'
+                    : 'border-border hover:border-charcoal-300 hover:bg-ivory-50'
+                } ${totalImages === 0 ? 'py-16' : 'py-8'}`}
+              >
+                <div className="flex flex-col items-center justify-center gap-3 text-center px-4">
+                  <div className="w-12 h-12 rounded-full bg-ivory-100 flex items-center justify-center">
+                    <ImagePlus size={22} className="text-charcoal-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-charcoal-700">
+                      {totalImages === 0 ? 'Add photos of your piece' : 'Add more photos'}
+                    </p>
+                    <p className="text-xs text-charcoal-400 mt-1">
+                      Drag & drop or click · JPG, PNG · Multiple allowed
+                    </p>
+                  </div>
                 </div>
                 <input
                   ref={fileInputRef}
@@ -517,88 +303,233 @@ export default function AddProduct() {
                   className="hidden"
                 />
               </div>
-            </div>
-          )}
 
-          {/* ════════════════════════════════════════ */}
-          {/* STEP 3: Review & Submit */}
-          {/* ════════════════════════════════════════ */}
-          {step === 3 && (
-            <div className="space-y-6">
-              <div className="rounded-xl bg-muted p-6 space-y-4">
-                <h3 className="font-heading font-semibold text-foreground">Review Your Product</h3>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              {/* Previews */}
+              {totalImages > 0 && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-4">
+                  {existingImages.map((url, i) => (
+                    <div key={`ex-${i}`} className="relative aspect-[3/4] rounded-xl overflow-hidden bg-ivory-100 group">
+                      <img src={url} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeExistingImage(url)}
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X size={14} />
+                      </button>
+                      {i === 0 && (
+                        <span className="absolute bottom-2 left-2 text-[10px] tracking-wider uppercase bg-black/60 text-white px-2 py-0.5 rounded-full">
+                          Cover
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                  {imagePreviews.map((preview, i) => (
+                    <div key={`new-${i}`} className="relative aspect-[3/4] rounded-xl overflow-hidden bg-ivory-100 group">
+                      <img src={preview} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(i)}
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X size={14} />
+                      </button>
+                      {existingImages.length === 0 && i === 0 && (
+                        <span className="absolute bottom-2 left-2 text-[10px] tracking-wider uppercase bg-black/60 text-white px-2 py-0.5 rounded-full">
+                          Cover
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* ─── NAME ─── */}
+            <section>
+              <label htmlFor="name" className="block text-sm font-medium text-charcoal-700 mb-2">
+                Name <span className="text-gold-500">*</span>
+              </label>
+              <input
+                id="name"
+                type="text"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. Draped Corset Dress"
+                className="w-full px-4 py-3.5 bg-white border border-border rounded-xl text-sm text-charcoal-800 placeholder:text-charcoal-300 focus:outline-none focus:ring-2 focus:ring-gold-300/40 focus:border-gold-400 transition-all"
+              />
+            </section>
+
+            {/* ─── PRICE ─── */}
+            <section>
+              <label htmlFor="price" className="block text-sm font-medium text-charcoal-700 mb-2">
+                Price <span className="text-gold-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.price}
+                  onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                  placeholder="0.00"
+                  className="w-full px-4 py-3.5 bg-white border border-border rounded-xl text-sm text-charcoal-800 placeholder:text-charcoal-300 focus:outline-none focus:ring-2 focus:ring-gold-300/40 focus:border-gold-400 transition-all"
+                />
+              </div>
+              {form.price && (
+                <p className="text-xs text-charcoal-400 mt-1.5">
+                  Will display as {formatPrice(parseFloat(form.price) || 0)}
+                </p>
+              )}
+            </section>
+
+            {/* ─── CATEGORY ─── */}
+            <section>
+              <label className="block text-sm font-medium text-charcoal-700 mb-3">
+                Category
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, category: f.category === cat ? '' : cat }))}
+                    className={`px-4 py-2 rounded-full text-xs font-medium tracking-wide transition-all ${
+                      form.category === cat
+                        ? 'bg-charcoal-700 text-white'
+                        : 'bg-ivory-100 text-charcoal-500 hover:bg-ivory-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            {/* ─── MORE DETAILS (Collapsible) ─── */}
+            <section>
+              <button
+                type="button"
+                onClick={() => setShowMore(!showMore)}
+                className="flex items-center justify-between w-full py-3 text-left group"
+              >
+                <span className="text-sm font-medium text-charcoal-600 group-hover:text-charcoal-800 transition-colors">
+                  Additional details
+                  <span className="text-charcoal-400 font-normal ml-1.5">(optional)</span>
+                </span>
+                {showMore ? (
+                  <ChevronUp size={18} className="text-charcoal-400" />
+                ) : (
+                  <ChevronDown size={18} className="text-charcoal-400" />
+                )}
+              </button>
+
+              {showMore && (
+                <div className="space-y-5 pt-2 pb-4 border-t border-border">
                   <div>
-                    <span className="text-foreground/50">Name</span>
-                    <p className="text-foreground font-medium">{form.name}</p>
+                    <label className="block text-sm text-charcoal-600 mb-1.5">Description</label>
+                    <textarea
+                      rows={3}
+                      value={form.description}
+                      onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                      placeholder="Describe the piece, fit, occasion..."
+                      className="w-full px-4 py-3 bg-white border border-border rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-gold-300/40 focus:border-gold-400 transition-all"
+                    />
                   </div>
-                  <div>
-                    <span className="text-foreground/50">Category</span>
-                    <p className="text-foreground font-medium">{form.category || '—'}</p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-charcoal-600 mb-1.5">Materials</label>
+                      <input
+                        type="text"
+                        value={form.materials}
+                        onChange={(e) => setForm((f) => ({ ...f, materials: e.target.value }))}
+                        placeholder="Silk, Cotton, Linen"
+                        className="w-full px-4 py-3 bg-white border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-300/40 focus:border-gold-400 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-charcoal-600 mb-1.5">Sizes</label>
+                      <input
+                        type="text"
+                        value={form.sizes}
+                        onChange={(e) => setForm((f) => ({ ...f, sizes: e.target.value }))}
+                        placeholder="XS, S, M, L or Made to measure"
+                        className="w-full px-4 py-3 bg-white border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-300/40 focus:border-gold-400 transition-all"
+                      />
+                    </div>
                   </div>
+
                   <div>
-                    <span className="text-foreground/50">Price</span>
-                    <p className="text-foreground font-medium">{form.price ? formatPrice(parseFloat(form.price)) : '—'}</p>
+                    <label className="block text-sm text-charcoal-600 mb-1.5">Artistic Statement</label>
+                    <textarea
+                      rows={2}
+                      value={form.artistic_statement}
+                      onChange={(e) => setForm((f) => ({ ...f, artistic_statement: e.target.value }))}
+                      placeholder="The story or inspiration behind this piece..."
+                      className="w-full px-4 py-3 bg-white border border-border rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-gold-300/40 focus:border-gold-400 transition-all"
+                    />
                   </div>
-                  <div>
-                    <span className="text-foreground/50">Lead Time</span>
-                    <p className="text-foreground font-medium">{form.lead_time || '—'}</p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-charcoal-600 mb-1.5">Lead Time</label>
+                      <input
+                        type="text"
+                        value={form.lead_time}
+                        onChange={(e) => setForm((f) => ({ ...f, lead_time: e.target.value }))}
+                        placeholder="1–2 weeks"
+                        className="w-full px-4 py-3 bg-white border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-300/40 focus:border-gold-400 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-charcoal-600 mb-1.5">Tags</label>
+                      <input
+                        type="text"
+                        value={form.tags}
+                        onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
+                        placeholder="sustainable, evening, custom"
+                        className="w-full px-4 py-3 bg-white border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-300/40 focus:border-gold-400 transition-all"
+                      />
+                    </div>
                   </div>
                 </div>
-                {form.description && (
-                  <div>
-                    <span className="text-sm text-foreground/50">Description</span>
-                    <p className="text-sm text-foreground mt-0.5">{form.description}</p>
-                  </div>
-                )}
+              )}
+            </section>
+
+            {/* Error */}
+            {error && (
+              <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-sm text-red-600">
+                {error}
               </div>
-            </div>
-          )}
-
-          {/* ─── Error display ─── */}
-          {error && (
-            <p className="text-destructive text-sm bg-destructive/5 px-3 py-2 rounded-lg">{error}</p>
-          )}
-
-          {/* ─── Action buttons ─── */}
-          <div className="flex gap-3 pt-4 border-t border-border">
-            {step > 1 && (
-              <button
-                type="button"
-                onClick={goToPrevStep}
-                className="flex items-center gap-2 px-4 py-2.5 bg-muted text-foreground font-medium rounded-xl hover:bg-muted/80 transition-all cursor-pointer text-sm"
-              >
-                <ArrowLeft size={16} />
-                Back
-              </button>
             )}
 
-            <div className="flex-1" />
-
-            {step < 3 ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  console.log('[AddProduct] NEXT — ADD PHOTOS clicked. Current step:', step);
-                  goToNextStep();
-                }}
-                className="flex items-center gap-2 px-6 py-2.5 bg-primary text-on-primary font-medium rounded-xl hover:opacity-90 transition-all cursor-pointer text-sm"
-              >
-                {step === 1 ? 'NEXT — ADD PHOTOS' : 'NEXT — REVIEW'}
-                <ArrowRight size={16} />
-              </button>
-            ) : (
+            {/* ─── PUBLISH ─── */}
+            <div className="pt-4 border-t border-border">
               <button
                 type="submit"
-                disabled={optimizing || saving || !form.name}
-                className="flex items-center justify-center gap-2 px-6 py-2.5 bg-primary text-on-primary font-medium rounded-xl hover:opacity-90 transition-all disabled:opacity-50 cursor-pointer text-sm"
+                disabled={!canPublish || optimizing || saving}
+                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-xl bg-charcoal-700 text-white font-medium text-sm tracking-wide hover:bg-charcoal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
-                {optimizing ? 'Optimizing Image…' : saving ? 'Uploading…' : editId ? 'Update Product' : 'Publish Product'}
+                {(optimizing || saving) && <Loader2 size={18} className="animate-spin" />}
+                {optimizing
+                  ? 'Optimizing photos…'
+                  : saving
+                  ? 'Publishing…'
+                  : editId
+                  ? 'Update Piece'
+                  : 'Publish Piece'}
               </button>
-            )}
-          </div>
-        </form>
+
+              {!canPublish && (
+                <p className="text-center text-xs text-charcoal-400 mt-3">
+                  Add a name, price, and at least one photo to publish
+                </p>
+              )}
+            </div>
+          </form>
+        </div>
       </div>
     </>
   );

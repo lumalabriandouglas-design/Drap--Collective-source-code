@@ -25,6 +25,9 @@ export default function DesignerDashboard() {
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const [navigating, setNavigating] = useState(false);
 
+  // Safe showroom ID (works whether the column is id or user_id)
+  const showroomId = profile?.id || profile?.user_id || user?.id;
+
   useEffect(() => {
     if (profile) loadDashboard();
   }, [profile, refreshSignal]);
@@ -43,11 +46,12 @@ export default function DesignerDashboard() {
       .select('*')
       .eq('user_id', profile!.user_id)
       .order('created_at', { ascending: false });
+
     setProducts(productData || []);
     setReels(reelsData || []);
 
     if (productData && productData.length > 0) {
-      const productIds = productData.map(p => p.id);
+      const productIds = productData.map((p) => p.id);
       const { data: views } = await supabase
         .from('product_views')
         .select('product_id')
@@ -68,10 +72,12 @@ export default function DesignerDashboard() {
 
   const handleShareProfile = async (e: React.MouseEvent) => {
     e.preventDefault();
-    const shareUrl = `${window.location.origin}/showroom/${profile?.user_id}`;
+    if (!showroomId) return;
+
+    const shareUrl = `${window.location.origin}/showroom/${showroomId}`;
 
     try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
+      if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(shareUrl);
       } else {
         const textArea = document.createElement('textarea');
@@ -102,12 +108,14 @@ export default function DesignerDashboard() {
 
   return (
     <>
-      <Helmet><title>Designer Studio — Drapé Collective</title></Helmet>
+      <Helmet>
+        <title>Designer Studio — Drapé Collective</title>
+      </Helmet>
+
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* ─── Welcome Header with Avatar ─── */}
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-5">
-            {/* Premium Avatar / Brand Initial */}
             <div className="shrink-0">
               {profile?.profile_photo_url ? (
                 <img
@@ -125,9 +133,12 @@ export default function DesignerDashboard() {
             </div>
             <div>
               <h1 className="font-heading text-3xl font-bold text-foreground">Designer Studio</h1>
-              <p className="text-foreground/60 mt-1">Welcome back, {profile?.brand_name || profile?.username || 'Designer'}</p>
+              <p className="text-foreground/60 mt-1">
+                Welcome back, {profile?.brand_name || profile?.username || 'Designer'}
+              </p>
             </div>
           </div>
+
           <button
             type="button"
             onClick={handleShareProfile}
@@ -137,7 +148,7 @@ export default function DesignerDashboard() {
           </button>
         </div>
 
-        {/* ─── Luxury Action Row ─── */}
+        {/* Action buttons */}
         <div className="flex items-center gap-3 mb-8 flex-wrap">
           <button
             type="button"
@@ -152,17 +163,19 @@ export default function DesignerDashboard() {
             )}
             + New Collection Piece
           </button>
+
           <button
             type="button"
             onClick={() => setProfileEditorOpen(true)}
             className="flex items-center gap-2 px-5 py-3 rounded-xl border border-border text-foreground/70 font-medium text-sm hover:bg-muted hover:text-foreground transition-all duration-300"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
               <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
             </svg>
             Edit Studio Profile
           </button>
+
           <button
             type="button"
             onClick={() => navigate('/messages')}
@@ -171,14 +184,18 @@ export default function DesignerDashboard() {
             <MessageCircle size={18} />
             Open Messages Channel
             {unreadCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gold-500 text-white text-[10px] font-semibold flex items-center justify-center shadow-[0_2px_6px_rgba(201,169,110,0.35)]">
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gold-500 text-white text-[10px] font-semibold flex items-center justify-center">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </button>
+
+          {/* FIXED showroom button */}
           <button
             type="button"
-            onClick={() => navigate(`/showroom/${profile?.user_id}`)}
+            onClick={() => {
+              if (showroomId) navigate(`/showroom/${showroomId}`);
+            }}
             className="flex items-center gap-2 px-5 py-3 rounded-xl border border-border text-foreground/70 font-medium text-sm hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all duration-300"
           >
             <Store size={18} />
@@ -204,7 +221,7 @@ export default function DesignerDashboard() {
                   <div>
                     <p className="text-2xl font-bold text-foreground">{stats.productCount}</p>
                     <p className="text-xs text-foreground/50">Products</p>
-              </div>
+                  </div>
                 </div>
               </div>
               <div className="p-6 rounded-2xl bg-muted">
@@ -233,21 +250,30 @@ export default function DesignerDashboard() {
 
             {/* Quick links */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
-              <Link to="/designer/products" className="p-4 rounded-xl border border-border hover:border-primary/30 hover:bg-primary/5 transition-all flex items-center gap-3">
+              <Link
+                to="/designer/products"
+                className="p-4 rounded-xl border border-border hover:border-primary/30 hover:bg-primary/5 transition-all flex items-center gap-3"
+              >
                 <Package size={20} className="text-primary" />
                 <div>
                   <p className="font-medium text-foreground text-sm">Manage Products</p>
                   <p className="text-xs text-foreground/40">{products.length} products</p>
                 </div>
               </Link>
-              <Link to="/designer/lookbooks" className="p-4 rounded-xl border border-border hover:border-primary/30 hover:bg-primary/5 transition-all flex items-center gap-3">
+              <Link
+                to="/designer/lookbooks"
+                className="p-4 rounded-xl border border-border hover:border-primary/30 hover:bg-primary/5 transition-all flex items-center gap-3"
+              >
                 <BookOpen size={20} className="text-secondary" />
                 <div>
                   <p className="font-medium text-foreground text-sm">Lookbooks</p>
                   <p className="text-xs text-foreground/40">Curate collections</p>
                 </div>
               </Link>
-              <Link to="/designer/reels" className="p-4 rounded-xl border border-border hover:border-primary/30 hover:bg-primary/5 transition-all flex items-center gap-3">
+              <Link
+                to="/designer/reels"
+                className="p-4 rounded-xl border border-border hover:border-primary/30 hover:bg-primary/5 transition-all flex items-center gap-3"
+              >
                 <Video size={20} className="text-accent" />
                 <div>
                   <p className="font-medium text-foreground text-sm">Reels</p>
@@ -256,36 +282,50 @@ export default function DesignerDashboard() {
               </Link>
             </div>
 
-            {/* Recent products */}
+            {/* Recent products — now clickable */}
             <div>
               <h2 className="font-heading text-xl font-semibold text-foreground mb-4">Recent Products</h2>
               {products.length === 0 ? (
                 <div className="text-center py-12 bg-muted rounded-2xl">
                   <Package size={36} className="mx-auto text-foreground/20 mb-3" />
                   <p className="text-foreground/40">No products yet</p>
-                  <Link to="/designer/add-product" className="text-primary text-sm mt-2 inline-block hover:underline">Add your first product</Link>
+                  <Link to="/designer/add-product" className="text-primary text-sm mt-2 inline-block hover:underline">
+                    Add your first product
+                  </Link>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {products.slice(0, 5).map(product => (
-                    <div key={product.id} className="flex items-center gap-4 p-4 rounded-xl bg-muted">
+                  {products.slice(0, 5).map((product) => (
+                    <Link
+                      key={product.id}
+                      to={`/product/${product.id}`}
+                      className="flex items-center gap-4 p-4 rounded-xl bg-muted hover:bg-muted/80 transition-colors"
+                    >
                       <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted-foreground/10 flex-shrink-0">
-                        <img src={product.image_urls?.[0] || ''} alt={product.name} className="w-full h-full object-cover" />
+                        <img
+                          src={product.image_urls?.[0] || ''}
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm text-foreground truncate">{product.name}</p>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          product.status === 'published' ? 'bg-green-500/10 text-green-600' :
-                          product.status === 'pending' ? 'bg-accent/10 text-accent' :
-                          'bg-destructive/10 text-destructive'
-                        }`}>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full ${
+                            product.status === 'published'
+                              ? 'bg-green-500/10 text-green-600'
+                              : product.status === 'pending'
+                              ? 'bg-accent/10 text-accent'
+                              : 'bg-destructive/10 text-destructive'
+                          }`}
+                        >
                           {product.status}
                         </span>
                       </div>
                       <span className="text-sm font-semibold text-foreground">
                         {product.price ? formatPrice(product.price) : '—'}
                       </span>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}
@@ -293,11 +333,7 @@ export default function DesignerDashboard() {
           </>
         )}
 
-        {/* ─── Profile Editor Modal ─── */}
-        <PremiumProfileEditor
-          open={profileEditorOpen}
-          onClose={() => setProfileEditorOpen(false)}
-        />
+        <PremiumProfileEditor open={profileEditorOpen} onClose={() => setProfileEditorOpen(false)} />
 
         <Toast
           message="Showroom link copied!"

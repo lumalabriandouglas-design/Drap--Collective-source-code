@@ -11,23 +11,20 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const unreadCount = useUnreadCount();
 
-  // Auth-aware nav links
   const navLinks = useMemo(() => {
     const links = [
-      { label: 'Reels', path: '/reels' },
-      { label: 'Discover', path: '/style-feed' },
       { label: 'Browse', path: '/browse' },
-      { label: 'Look Books', path: '/lookbooks' },
+      { label: 'Discover', path: '/style-feed' },
       { label: 'Style Quiz', path: '/quiz' },
     ];
     if (!user) {
-      links.push({ label: 'For Designers', path: '/join' });
+      links.push({ label: 'For Designers', path: '/signup' });
     }
     return links;
   }, [user]);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
+    const onScroll = () => setScrolled(window.scrollY > 16);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
@@ -37,204 +34,223 @@ export default function Navbar() {
   }, [location.pathname]);
 
   const isHome = location.pathname === '/';
-  const isTransparent = isHome && !scrolled;
+  const isShowroom = location.pathname.startsWith('/showroom');
+  const isTransparent = (isHome || isShowroom) && !scrolled && !mobileOpen;
 
-  const containerBg = isTransparent
+  const barClass = isTransparent
     ? 'bg-transparent'
-    : 'bg-white/90 backdrop-blur-xl border-b border-border-light';
+    : 'bg-white/95 backdrop-blur-xl border-b border-charcoal-100/80 shadow-[0_1px_0_rgba(0,0,0,0.03)]';
 
-  const textColor = (isActive: boolean) =>
-    isActive
-      ? 'text-gold-400'
-      : isTransparent
-        ? 'text-white/80 hover:text-white'
-        : 'text-charcoal-400 hover:text-charcoal-700';
+  const linkClass = (active: boolean) =>
+    `text-[12px] tracking-[0.14em] uppercase transition-colors duration-300 ${
+      active
+        ? isTransparent
+          ? 'text-gold-300'
+          : 'text-charcoal-800'
+        : isTransparent
+          ? 'text-white/70 hover:text-white'
+          : 'text-charcoal-400 hover:text-charcoal-700'
+    }`;
 
-  const dividerClass = isTransparent
-    ? 'border-white/10'
-    : 'border-border-light';
-
-  const mobileMenuBg = isTransparent
-    ? 'bg-charcoal-800/95 backdrop-blur-xl border-white/10'
-    : 'bg-white border-border-light';
-
-  const mobileTextClass = isTransparent
-    ? 'text-white/70 hover:text-white'
-    : 'text-charcoal-500 hover:text-charcoal-700';
-
-  const iconColor = isTransparent
+  const iconClass = isTransparent
     ? 'text-white/70 hover:text-white'
     : 'text-charcoal-400 hover:text-charcoal-700';
 
+  const mutedClass = isTransparent
+    ? 'text-white/45 hover:text-white/80'
+    : 'text-charcoal-300 hover:text-charcoal-600';
+
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 select-none ${containerBg}`}>
+    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${barClass}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 md:h-20">
-          <Link to="/" className="flex items-center group flex-shrink-0">
-            <DrapeWordmark className="h-5 md:h-6 w-auto transition-all duration-500" light={isTransparent} />
+        <div className="flex items-center justify-between h-16 md:h-[4.5rem]">
+          {/* Logo */}
+          <Link to="/" className="flex-shrink-0" aria-label="Drapé home">
+            <DrapeWordmark className="h-5 md:h-[1.35rem] w-auto" light={isTransparent} />
           </Link>
 
-          {/* ── Desktop nav ── */}
-          <div className="hidden md:flex items-center gap-8">
+          {/* Desktop */}
+          <div className="hidden md:flex items-center gap-9">
             {navLinks.map((link) => (
-              <Link key={link.path} to={link.path} className={`py-2 text-sm tracking-wide transition-all duration-300 ${textColor(location.pathname === link.path)}`}>
+              <Link
+                key={link.path}
+                to={link.path}
+                className={linkClass(location.pathname === link.path)}
+              >
                 {link.label}
               </Link>
             ))}
 
+            <div className={`w-px h-4 ${isTransparent ? 'bg-white/15' : 'bg-charcoal-200'}`} />
+
             {authLoading ? (
-              <div className="flex items-center gap-2">
-                <span className="w-20 h-3 rounded-full bg-white/10 animate-pulse" />
-              </div>
+              <div className="w-16 h-3 rounded-full bg-charcoal-100 animate-pulse" />
             ) : user ? (
-              <div className="flex items-center gap-5">
-                {profile?.role === 'admin' && <Link to="/admin" className={`py-2 text-sm tracking-wide transition-all duration-300 ${textColor(false)}`}>Admin</Link>}
-                {profile?.role === 'designer' && <Link to="/dashboard" className={`py-2 text-sm tracking-wide transition-all duration-300 ${textColor(false)}`}>Studio</Link>}
-                {profile?.role === 'customer' && <Link to="/collective" className={`py-2 text-sm tracking-wide transition-all duration-300 ${textColor(false)}`}>Collective</Link>}
-                <Link to="/wishlist" className={`relative p-2 transition-all duration-300 ${iconColor}`} aria-label="Wishlist">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <div className="flex items-center gap-6">
+                {profile?.role === 'designer' && (
+                  <Link to="/dashboard" className={linkClass(location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/designer'))}>
+                    Studio
+                  </Link>
+                )}
+                {profile?.role === 'customer' && (
+                  <Link to="/collective" className={linkClass(location.pathname === '/collective')}>
+                    Collective
+                  </Link>
+                )}
+                {profile?.role === 'admin' && (
+                  <Link to="/admin" className={linkClass(location.pathname.startsWith('/admin'))}>
+                    Admin
+                  </Link>
+                )}
+
+                <Link to="/wishlist" className={`relative p-1.5 transition-colors ${iconClass}`} aria-label="Wishlist">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
                     <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
                   </svg>
                 </Link>
-                <Link to="/messages" className={`relative py-2 text-sm tracking-wide transition-all duration-300 ${iconColor}`}>
-                  Messages
+
+                <Link to="/messages" className={`relative p-1.5 transition-colors ${iconClass}`} aria-label="Messages">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
+                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                  </svg>
                   {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-4 w-4 h-4 rounded-full bg-gold-500 text-white text-[9px] font-semibold flex items-center justify-center">
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-gold-500 text-white text-[9px] font-semibold flex items-center justify-center">
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
                 </Link>
-                <button onClick={signOut} className={`py-2 text-sm tracking-wide transition-all duration-300 ${isTransparent ? 'text-white/50 hover:text-white/80' : 'text-charcoal-300 hover:text-error'}`}>Sign Out</button>
+
+                <button type="button" onClick={signOut} className={`text-[11px] tracking-[0.1em] uppercase transition-colors ${mutedClass}`}>
+                  Sign out
+                </button>
+
                 {profile?.profile_photo_url ? (
-                  <img src={profile.profile_photo_url} alt="" className="w-8 h-8 rounded-full object-cover border border-white/20" />
+                  <img
+                    src={profile.profile_photo_url}
+                    alt=""
+                    className="w-7 h-7 rounded-full object-cover ring-1 ring-black/5"
+                  />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-charcoal-200 flex items-center justify-center" aria-hidden="true">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white">
-                      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
-                    </svg>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center ${isTransparent ? 'bg-white/15' : 'bg-charcoal-100'}`}>
+                    <span className={`font-serif text-xs ${isTransparent ? 'text-white/70' : 'text-charcoal-500'}`}>
+                      {(profile?.brand_name || profile?.username || 'U').charAt(0).toUpperCase()}
+                    </span>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="flex items-center gap-4">
-                <Link to="/login" className={`py-2 text-sm tracking-wide transition-all duration-300 ${textColor(false)}`}>Sign In</Link>
-                <Link to="/signup" className={`btn-luxury text-[11px] !py-2 !px-5 ${
-                  isTransparent
-                    ? 'bg-white/10 backdrop-blur-sm text-white border border-white/20 hover:bg-white/20 hover:border-white/40'
-                    : 'btn-luxury-primary'
-                }`}>Get Started</Link>
+              <div className="flex items-center gap-5">
+                <Link to="/login" className={linkClass(false)}>
+                  Sign in
+                </Link>
+                <Link
+                  to="/signup"
+                  className={`text-[11px] tracking-[0.14em] uppercase px-5 py-2 rounded-full transition-all ${
+                    isTransparent
+                      ? 'border border-white/25 text-white hover:bg-white/10'
+                      : 'bg-charcoal-800 text-white hover:bg-charcoal-900'
+                  }`}
+                >
+                  Join
+                </Link>
               </div>
             )}
           </div>
 
-          {/* ── Mobile hamburger ── */}
+          {/* Mobile toggle */}
           <button
-            className={`md:hidden flex items-center justify-center min-w-[44px] min-h-[44px] transition-colors active:scale-95 ${isTransparent ? 'text-white' : 'text-charcoal-500'}`}
+            type="button"
+            className={`md:hidden flex items-center justify-center w-11 h-11 -mr-2 transition-colors ${
+              isTransparent ? 'text-white' : 'text-charcoal-600'
+            }`}
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              {mobileOpen ? <path d="M18 6L6 18M6 6l12 12" /> : <path d="M4 6h16M4 12h16M4 18h16" />}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
+              {mobileOpen ? (
+                <path d="M18 6L6 18M6 6l12 12" />
+              ) : (
+                <path d="M4 7h16M4 12h16M4 17h16" />
+              )}
             </svg>
           </button>
         </div>
 
-        {/* ── Mobile menu ── */}
+        {/* Mobile panel */}
         {mobileOpen && (
-          <div className={`md:hidden rounded-2xl px-3 pb-4 pt-3 shadow-elevation-2 border mb-4 animate-slide-down ${mobileMenuBg}`}>
-            {/* Brand header — extra padding for vertical alignment with menu items */}
-            <div className="pt-1 pb-3 px-[14px]">
-              <DrapeWordmark className="h-4 w-auto" light={isTransparent} />
+          <div className="md:hidden pb-5 border-t border-charcoal-100/60 bg-white/98 backdrop-blur-xl -mx-4 px-4 sm:-mx-6 sm:px-6 animate-slide-down">
+            <div className="pt-3 space-y-0.5">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className={`flex items-center min-h-[44px] px-2 text-[13px] tracking-[0.08em] uppercase ${
+                    location.pathname === link.path ? 'text-charcoal-900' : 'text-charcoal-500'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
             </div>
-
-            {navLinks.map((link) => (
-              <Link key={link.path} to={link.path} onClick={() => setMobileOpen(false)}
-                className={`flex items-center min-h-[44px] px-[14px] rounded-xl text-sm transition-colors tracking-wide active:scale-[0.98] ${mobileTextClass}`}>
-                {link.label}
-              </Link>
-            ))}
 
             {authLoading ? null : user ? (
               <>
-                {/* ── Inset divider 1 ── */}
-                <div className={`mx-4 mt-2 pt-2 border-t ${dividerClass}`} />
-                <div className="space-y-0.5 mt-2">
-                  <Link to="/wishlist" onClick={() => setMobileOpen(false)}
-                    className={`flex items-center gap-3 min-h-[44px] px-[14px] rounded-xl text-sm transition-colors active:scale-[0.98] ${mobileTextClass}`}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0">
-                      <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-                    </svg>
-                    Wishlist
-                  </Link>
-                  <Link to="/messages" onClick={() => setMobileOpen(false)}
-                    className={`flex items-center gap-3 min-h-[44px] px-[14px] rounded-xl text-sm transition-colors active:scale-[0.98] ${mobileTextClass}`}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0">
-                      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-                    </svg>
-                    Messages
-                    {unreadCount > 0 && (
-                      <span className="ml-auto w-5 h-5 rounded-full bg-gold-500 text-white text-[10px] font-semibold flex items-center justify-center">
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </span>
-                    )}
-                  </Link>
-                  {profile?.role === 'admin' && (
-                    <Link to="/admin" onClick={() => setMobileOpen(false)}
-                      className={`flex items-center gap-3 min-h-[44px] px-[14px] rounded-xl text-sm transition-colors active:scale-[0.98] ${mobileTextClass}`}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0">
-                        <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                      Admin
-                    </Link>
-                  )}
+                <div className="my-3 h-px bg-charcoal-100" />
+                <div className="space-y-0.5">
                   {profile?.role === 'designer' && (
-                    <Link to="/dashboard" onClick={() => setMobileOpen(false)}
-                      className={`flex items-center gap-3 min-h-[44px] px-[14px] rounded-xl text-sm transition-colors active:scale-[0.98] ${mobileTextClass}`}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0">
-                        <path d="M14.7 6.3a1 1 0 00 0 1.4l1.6 1.6a1 1 0 00 1.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
-                      </svg>
+                    <Link to="/dashboard" className="flex items-center min-h-[44px] px-2 text-[13px] tracking-[0.08em] uppercase text-charcoal-500">
                       Studio
                     </Link>
                   )}
                   {profile?.role === 'customer' && (
-                    <Link to="/collective" onClick={() => setMobileOpen(false)}
-                      className={`flex items-center gap-3 min-h-[44px] px-[14px] rounded-xl text-sm transition-colors active:scale-[0.98] ${mobileTextClass}`}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0">
-                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M23 21v-2a4 4 0 00-3-3.87" />
-                        <path d="M16 3.13a4 4 0 010 7.75" />
-                      </svg>
+                    <Link to="/collective" className="flex items-center min-h-[44px] px-2 text-[13px] tracking-[0.08em] uppercase text-charcoal-500">
                       Collective
                     </Link>
                   )}
+                  {profile?.role === 'admin' && (
+                    <Link to="/admin" className="flex items-center min-h-[44px] px-2 text-[13px] tracking-[0.08em] uppercase text-charcoal-500">
+                      Admin
+                    </Link>
+                  )}
+                  <Link to="/wishlist" className="flex items-center min-h-[44px] px-2 text-[13px] tracking-[0.08em] uppercase text-charcoal-500">
+                    Wishlist
+                  </Link>
+                  <Link to="/messages" className="flex items-center min-h-[44px] px-2 text-[13px] tracking-[0.08em] uppercase text-charcoal-500">
+                    Messages
+                    {unreadCount > 0 && (
+                      <span className="ml-2 min-w-[18px] h-[18px] rounded-full bg-gold-500 text-white text-[10px] font-semibold flex items-center justify-center">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </Link>
                 </div>
-                {/* ── Inset divider 2 ── */}
-                <div className={`mx-4 mt-2 pt-2 border-t ${dividerClass}`} />
-                <div className="mt-2">
-                  <button onClick={() => { signOut(); setMobileOpen(false); }}
-                    className={`flex items-center gap-3 min-h-[44px] w-full px-[14px] rounded-xl text-sm transition-colors active:scale-[0.98] ${isTransparent ? 'text-white/40 hover:text-white/70' : 'text-charcoal-300 hover:text-error'}`}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0">
-                      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-                      <polyline points="16 17 21 12 16 7" />
-                      <line x1="21" y1="12" x2="9" y2="12" />
-                    </svg>
-                    Sign Out
-                  </button>
-                </div>
+                <div className="my-3 h-px bg-charcoal-100" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    signOut();
+                    setMobileOpen(false);
+                  }}
+                  className="flex items-center min-h-[44px] w-full px-2 text-[13px] tracking-[0.08em] uppercase text-charcoal-400"
+                >
+                  Sign out
+                </button>
               </>
             ) : (
               <>
-                {/* ── Inset divider ── */}
-                <div className={`mx-4 mt-2 pt-2 border-t ${dividerClass}`} />
-                <div className="space-y-1 mt-2">
-                  <Link to="/login" onClick={() => setMobileOpen(false)}
-                    className="flex items-center min-h-[44px] px-[14px] rounded-xl text-sm transition-colors active:scale-[0.98] text-charcoal-300">
-                    Sign In
+                <div className="my-3 h-px bg-charcoal-100" />
+                <div className="space-y-2 pt-1">
+                  <Link
+                    to="/login"
+                    className="flex items-center justify-center min-h-[44px] text-[12px] tracking-[0.12em] uppercase text-charcoal-600"
+                  >
+                    Sign in
                   </Link>
-                  <Link to="/signup" onClick={() => setMobileOpen(false)}
-                    className="btn-luxury btn-luxury-primary text-[11px] !py-3 !px-5 inline-flex items-center justify-center w-full min-h-[44px] mt-1">
-                    Get Started
+                  <Link
+                    to="/signup"
+                    className="flex items-center justify-center min-h-[44px] bg-charcoal-800 text-white text-[12px] tracking-[0.12em] uppercase rounded-full"
+                  >
+                    Join
                   </Link>
                 </div>
               </>

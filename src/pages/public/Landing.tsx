@@ -6,9 +6,8 @@ import { Helmet } from 'react-helmet-async';
 import { supabase } from '../../lib/supabase';
 import { useHeroSlides } from '../../hooks/useHeroSlides';
 import HeroSlider from '../../components/ui/HeroSlider';
-import LazyImage from '../../components/ui/LazyImage';
-import { optimizeImageUrl } from '../../lib/imageUrl';
 import type { Product } from '../../types/supabase';
+import ProductCard from '../../components/ui/ProductCard';
 
 /* ─── Landing categories (curated editorial subset) ─── */
 const LANDING_CATEGORIES = [
@@ -25,7 +24,6 @@ const LANDING_CATEGORIES = [
 export default function Landing() {
   /* ─── Hero Slider ─── */
   const { slides: heroSlides, loading: heroLoading } = useHeroSlides(20);
-  const { formatPrice } = useCurrency();
 
   /* ─── Browse Products ─── */
   const [products, setProducts] = useState<Product[]>([]);
@@ -37,7 +35,7 @@ export default function Landing() {
     try {
       let q = supabase
         .from('products')
-        .select('*')
+        .select('*, designer:user_id(username, brand_name, profile_photo_url)')
         .eq('status', 'published')
         .eq('is_hidden', false)
         .eq('is_deleted', false)
@@ -76,7 +74,10 @@ export default function Landing() {
     <>
       <Helmet>
         <title>Drapé Collective — Discover Emerging Fashion Designers</title>
-        <meta name="description" content="A private marketplace connecting emerging fashion designers with discerning customers. Discover unique, handcrafted fashion." />
+        <meta
+          name="description"
+          content="A private marketplace connecting emerging fashion designers with discerning customers. Discover unique, handcrafted fashion."
+        />
       </Helmet>
 
       <div className="relative z-0">
@@ -127,13 +128,14 @@ export default function Landing() {
 
         {/* ── Loading skeleton ── */}
         {productsLoading && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-8 sm:gap-x-5 sm:gap-y-10">
             {Array.from({ length: 10 }).map((_, i) => (
               <div key={i} className="aspect-[3/4] rounded-xl bg-ivory-100 overflow-hidden">
                 <div
                   className="w-full h-full"
                   style={{
-                    background: 'linear-gradient(90deg, transparent 0%, oklch(92% 0.008 50 / 0.5) 50%, transparent 100%)',
+                    background:
+                      'linear-gradient(90deg, transparent 0%, oklch(92% 0.008 50 / 0.5) 50%, transparent 100%)',
                     backgroundSize: '200% 100%',
                     animation: 'shimmer 1.8s ease-in-out infinite',
                   }}
@@ -157,7 +159,7 @@ export default function Landing() {
         {/* ── Product Grid ── */}
         {!productsLoading && products.length > 0 && (
           <>
-            {/* Mobile label showing active category */}
+            {/* Mobile label */}
             <div className="sm:hidden flex items-center gap-2 mb-4">
               <span className="text-[10px] tracking-[0.15em] uppercase text-charcoal-300 font-medium">
                 {activeLabel}
@@ -168,52 +170,15 @@ export default function Landing() {
               </span>
             </div>
 
-            <div
-              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5"
-              style={{ animation: 'fade-in 0.6s ease-out' }}
-            >
-              {products.map((product, idx) => {
-                const imageUrl = product.image_urls?.[0] || '';
-                return (
-                  <Link
-                    key={product.id}
-                    to={`/product/${product.id}`}
-                    className="group block"
-                    style={{ animationDelay: `${idx * 60}ms` }}
-                  >
-                    {/* Image container */}
-                    <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-ivory-50 card-luxury">
-                      <LazyImage
-                        src={optimizeImageUrl(imageUrl)}
-                        alt={product.name}
-                        className="w-full h-full"
-                        imgClassName="group-hover:scale-105 transition-transform duration-700 ease-out"
-                        loading={idx < 4 ? 'eager' : 'lazy'}
-                      />
-                      {/* Hover overlay — designer credit */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-400 pointer-events-none" />
-                      <div className="absolute bottom-0 left-0 right-0 p-3 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-400 pointer-events-none">
-                        <p className="text-[10px] tracking-[0.1em] uppercase text-white/60 font-medium">
-                          {product.materials?.slice(0, 2).join(', ') || 'Fashion'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Product info */}
-                    <div className="mt-3 px-0.5">
-                      <h3 className="font-serif text-sm sm:text-base font-medium text-charcoal-800 truncate leading-snug">
-                        {product.name}
-                      </h3>
-                      <p className="text-xs text-charcoal-400 mt-0.5 font-light truncate">
-                        {product.description || product.category || 'Fashion'}
-                      </p>
-                      <p className="text-sm font-medium text-charcoal-700 mt-1.5 tracking-tight">
-                        {product.price != null ? formatPrice(product.price) : 'Price on request'}
-                      </p>
-                    </div>
-                  </Link>
-                );
-              })}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-8 sm:gap-x-5 sm:gap-y-10">
+              {products.map((product, idx) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  index={idx}
+                  showDesigner={true}
+                />
+              ))}
             </div>
           </>
         )}
@@ -235,6 +200,7 @@ export default function Landing() {
           </p>
           <div className="gold-divider-center" />
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="p-7 rounded-2xl bg-ivory-50 hover:bg-gold-50/40 transition-all duration-500 group border border-transparent hover:border-gold-200/30">
             <div className="w-11 h-11 rounded-xl bg-charcoal-700/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-400">
@@ -245,6 +211,7 @@ export default function Landing() {
               Each piece is created by independent designers with a unique artistic vision and commitment to craftsmanship.
             </p>
           </div>
+
           <div className="p-7 rounded-2xl bg-ivory-50 hover:bg-gold-50/40 transition-all duration-500 group border border-transparent hover:border-gold-200/30">
             <div className="w-11 h-11 rounded-xl bg-charcoal-700/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-400">
               <Shield size={20} className="text-charcoal-600" />
@@ -254,6 +221,7 @@ export default function Landing() {
               An exclusive community where quality meets authenticity. Every designer is vetted before joining.
             </p>
           </div>
+
           <div className="p-7 rounded-2xl bg-ivory-50 hover:bg-gold-50/40 transition-all duration-500 group border border-transparent hover:border-gold-200/30">
             <div className="w-11 h-11 rounded-xl bg-charcoal-700/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-400">
               <Heart size={20} className="text-charcoal-600" />

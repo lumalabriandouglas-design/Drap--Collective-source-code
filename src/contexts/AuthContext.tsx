@@ -18,37 +18,51 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+// Helper: promise with timeout
+function withTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('Request timed out')), ms)
+    ),
+  ]);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [suspensionError, setSuspensionError] = useState<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const initialLoadDone = useRef(false);
 
   async function fetchProfile(userId: string) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-    setProfile(data);
-    console.log('[AuthContext] Profile loaded for user:', userId, 'role:', data?.role);
-    return data;
+    try {
+      const { data } = await withTimeout(
+        supabase.from('profiles').select('*').eq('user_id', userId).single(),
+        6000
+      );
+      setProfile(data);
+      return data;
+    } catch (err) {
+      console.warn('[AuthContext] Profile fetch failed or timed out:', err);
+      setProfile(null);
+      return null;
+    }
   }
 
-  /** Check if the loaded profile is suspended and sign out if so */
   async function enforceSuspension(profileData: Profile | null) {
     if (profileData?.is_suspended) {
       setSuspensionError('Your account has been suspended. Contact support for more information.');
       await supabase.auth.signOut();
       setUser(null);
       setProfile(null);
-      return true; // was suspended
+      return true;
     }
     return false;
   }
 
-  // Set up Realtime subscription on profiles table to catch suspension toggles
+  // Realtime suspension listener
   useEffect(() => {
     if (!profile?.id) return;
 
@@ -63,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           filter: `id=eq.${profile.id}`,
         },
         async (payload) => {
-          if (payload.new.is_suspended) {
+          if ((payload.new as any).is_suspended) {
             setSuspensionError('Your account has been suspended. Contact support for more information.');
             await supabase.auth.signOut();
             setUser(null);
@@ -81,24 +95,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [profile?.id]);
 
-  // Initial session + profile load — loading stays true until profile is resolved
+  // Initial session load with timeout protection
   useEffect(() => {
     let cancelled = false;
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (cancelled) return;
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
+    async function init() {
+      try {
+        const { data: { session } } = await withTimeout(supabase.auth.getSession(), 7000);
+        if (cancelled) return;
 
-      if (currentUser) {
-        const profileData = await fetchProfile(currentUser.id);
-        await enforceSuspension(profileData);
-      }
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
 
-      if (!cancelled) {
-        setLoading(false);
+        if (currentUser) {
+          const profileData = await fetchProfile(currentUser.id);
+          if (!cancelled) await enforceSuspension(profileData);
+        }
+      } catch (err) {
+        console.warn('[AuthContext] Initial session failed:', err);
+        // Fail open — let the user at least see the public site
+        setUser(null);
+        setProfile(null);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          initialLoadDone.current = true;
+        }
       }
-    });
+    }
+
+    init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const nextUser = session?.user ?? null;
@@ -106,8 +132,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (nextUser) {
         const profileData = await fetchProfile(nextUser.id);
-        // Don't run suspension check on SIGNED_IN if the user just logged in
-        // — signIn already handles it. But do check on TOKEN_REFRESH, USER_UPDATED etc.
         if (_event !== 'SIGNED_IN') {
           await enforceSuspension(profileData);
         }
@@ -120,6 +144,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       subscription.unsubscribe();
     };
+  }, []);
+
+  // ─── Recovery when user returns to the tab ───
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === 'visible' && initialLoadDone.current) {
+        // Quietly re-validate the session when the user comes back
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!session) {
+            setUser(null);
+            setProfile(null);
+          }
+        }).catch(() => {
+          // Ignore — network may still be waking up
+        });
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
   async function refreshProfile() {
@@ -147,13 +191,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!error && data?.user) {
       const profileData = await fetchProfile(data.user.id);
 
-      // Suspended user trying to log in
       if (profileData?.is_suspended) {
         setSuspensionError('This account has been suspended. Contact support.');
         await supabase.auth.signOut();
         setUser(null);
         setProfile(null);
-        // Return a custom error so the login form can display it inline
         const suspensionAuthError = new Error('This account has been suspended. Contact support.') as AuthError;
         suspensionAuthError.status = 403;
         return { error: suspensionAuthError, profile: null };
