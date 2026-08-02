@@ -15,9 +15,6 @@ interface ErrorBoundaryState {
 /**
  * ErrorBoundary — catches render errors in its subtree and displays
  * a polite, brand-aligned fallback UI instead of crashing the whole app.
- *
- * Place it around Layout / dashboard routes so a desktop-only component
- * crash never freezes the user on a loading spinner.
  */
 export default class ErrorBoundary extends Component<
   ErrorBoundaryProps,
@@ -36,8 +33,14 @@ export default class ErrorBoundary extends Component<
     console.error(`ErrorBoundary${this.props.label ? ` (${this.props.label})` : ''}:`, error, info.componentStack);
   }
 
+  /** Soft retry — reset boundary state and re-render children */
   handleRetry = (): void => {
     this.setState({ hasError: false, error: null });
+  };
+
+  /** Hard recovery — full page reload (clears dead sessions, chunks, realtime) */
+  handleHardReload = (): void => {
+    window.location.reload();
   };
 
   render(): ReactNode {
@@ -45,7 +48,6 @@ export default class ErrorBoundary extends Component<
       return (
         <div className="min-h-screen flex items-center justify-center bg-bg px-4">
           <div className="max-w-md w-full text-center animate-scale-in">
-            {/* Brand icon */}
             <div className="mx-auto mb-6 w-16 h-16 rounded-full bg-ivory-100 flex items-center justify-center">
               <svg
                 width="28"
@@ -66,11 +68,10 @@ export default class ErrorBoundary extends Component<
             </h2>
             <p className="text-sm text-charcoal-400 font-light leading-relaxed mb-6 max-w-xs mx-auto">
               {this.props.label ?? 'A section'} encountered an unexpected error.
-              Our team has been notified.
+              This often happens after the tab has been idle for a while.
             </p>
 
-            {/* Stack trace (dev only) */}
-            {this.state.error && (
+            {this.state.error && import.meta.env.DEV && (
               <details className="mb-6 text-left max-w-full overflow-auto">
                 <summary className="cursor-pointer text-xs text-charcoal-300 hover:text-charcoal-500 font-medium tracking-wide mb-2">
                   Error details
@@ -83,10 +84,16 @@ export default class ErrorBoundary extends Component<
               </details>
             )}
 
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <button
+                onClick={this.handleHardReload}
+                className="btn-luxury btn-luxury-primary text-xs"
+              >
+                Reload page
+              </button>
               <button
                 onClick={this.handleRetry}
-                className="btn-luxury btn-luxury-primary text-xs"
+                className="btn-luxury btn-luxury-outline text-xs"
               >
                 Try Again
               </button>

@@ -34,17 +34,20 @@ export default function DesignerDashboard() {
 
   async function loadDashboard() {
     setLoading(true);
+    // products.user_id references profiles.id (see FK + AddProduct insert)
+    const productOwnerId = profile?.id || user!.id;
     const { data: productData } = await supabase
       .from('products')
       .select('*')
-      .eq('user_id', user!.id)
+      .eq('user_id', productOwnerId)
       .eq('is_deleted', false)
       .order('created_at', { ascending: false });
 
+    const reelsOwnerId = profile?.user_id || user!.id;
     const { data: reelsData } = await supabase
       .from('reels_videos')
       .select('*')
-      .eq('user_id', profile!.user_id)
+      .eq('user_id', reelsOwnerId)
       .order('created_at', { ascending: false });
 
     setProducts(productData || []);

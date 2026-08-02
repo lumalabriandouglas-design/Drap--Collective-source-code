@@ -36,13 +36,27 @@ export default function PublicShowroom() {
   const fetchShowroom = useCallback(async (id: string) => {
     setData((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      const { data: profile, error: profileErr } = await supabase
+      // Look up by profiles.id OR profiles.user_id so both share URL formats work
+      const { data: profiles, error: profileErr } = await supabase
         .from('profiles')
         .select('*')
         .or(`id.eq.${id},user_id.eq.${id}`)
-        .single();
+        .limit(2);
 
-      if (profileErr || !profile) {
+      if (profileErr) {
+        console.error('[PublicShowroom] profile query error:', profileErr);
+        setData({
+          designer: null,
+          products: [],
+          loading: false,
+          error: 'Unable to load designer. Please try again.',
+        });
+        return;
+      }
+
+      const profile = (profiles && profiles.length > 0 ? profiles[0] : null) as Profile | null;
+
+      if (!profile) {
         setData({ designer: null, products: [], loading: false, error: 'Designer not found' });
         return;
       }
@@ -57,20 +71,35 @@ export default function PublicShowroom() {
         return;
       }
 
-      // Products are linked via profiles.id
+      // Products.user_id references profiles.id (see FK). Also try auth user_id
+      // in case older rows were written with the auth UUID.
+      const ownerIds = Array.from(
+        new Set([profile.id, profile.user_id].filter(Boolean)),
+      );
+
       const { data: products, error: productsErr } = await supabase
         .from('products')
         .select('*')
-        .eq('user_id', profile.id)
+        .in('user_id', ownerIds)
         .eq('status', 'published')
         .eq('is_hidden', false)
         .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
-      if (productsErr) throw productsErr;
+      if (productsErr) {
+        console.error('[PublicShowroom] products query error:', productsErr);
+        // Still show the designer profile even if products fail to load
+        setData({
+          designer: profile,
+          products: [],
+          loading: false,
+          error: null,
+        });
+        return;
+      }
 
       setData({
-        designer: profile as Profile,
+        designer: profile,
         products: (products ?? []) as Product[],
         loading: false,
         error: null,
@@ -80,6 +109,7 @@ export default function PublicShowroom() {
         err && typeof err === 'object' && 'message' in err
           ? String((err as { message: unknown }).message)
           : 'Failed to load showroom';
+      console.error('[PublicShowroom] unexpected error:', err);
       setData({ designer: null, products: [], loading: false, error: message });
     }
   }, []);

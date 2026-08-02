@@ -113,7 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         console.warn('[AuthContext] Initial session failed:', err);
-        // Fail open — let the user at least see the public site
         setUser(null);
         setProfile(null);
       } finally {
@@ -146,24 +145,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // ─── Recovery when user returns to the tab ───
+  // ─── Recovery when user returns to the tab after long idle ───
   useEffect(() => {
-    function handleVisibility() {
-      if (document.visibilityState === 'visible' && initialLoadDone.current) {
-        // Quietly re-validate the session when the user comes back
-        supabase.auth.getSession().then(({ data: { session } }) => {
+    let recovering = false;
+
+    async function recoverSession() {
+      if (document.visibilityState !== 'visible' || !initialLoadDone.current || recovering) {
+        return;
+      }
+      recovering = true;
+      try {
+        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          const { data: { session } } = await supabase.auth.getSession();
           if (!session) {
             setUser(null);
             setProfile(null);
           }
-        }).catch(() => {
-          // Ignore — network may still be waking up
-        });
+          return;
+        }
+
+        const session = refreshed.session;
+        if (!session?.user) {
+          setUser(null);
+          setProfile(null);
+          return;
+        }
+
+        setUser(session.user);
+        const profileData = await fetchProfile(session.user.id);
+        await enforceSuspension(profileData);
+      } catch (err) {
+        console.warn('[AuthContext] Session recovery failed:', err);
+      } finally {
+        recovering = false;
       }
     }
 
+    function handleVisibility() {
+      if (document.visibilityState === 'visible') {
+        setTimeout(() => {
+          void recoverSession();
+        }, 300);
+      }
+    }
+
+    function handleOnline() {
+      void recoverSession();
+    }
+
     document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('online', handleOnline);
+    };
   }, []);
 
   async function refreshProfile() {
