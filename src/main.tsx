@@ -2,23 +2,20 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
-import { registerManifest, registerServiceWorker, injectFallbackIcons } from './lib/pwa';
-import { initUpdateChecker, handleServiceWorkerUpdate } from './lib/updateChecker';
+import { registerManifest, injectFallbackIcons } from './lib/pwa';
 import { suppressViteHmrErrors } from './lib/suppressErrors';
 
 // Drop known non-critical console noise early
 suppressViteHmrErrors();
 
 /**
- * Register the PWA manifest and service worker on initial load.
- * These run after render so they don't block first paint.
+ * PWA only — NO auto-reload / update checker (that caused the infinite loop).
  */
 function initPwa() {
   registerManifest();
   injectFallbackIcons();
-  registerServiceWorker({
-    onUpdate: () => handleServiceWorkerUpdate(),
-  });
+  // Service worker + updateChecker DISABLED until fingerprint logic is safe
+  // registerServiceWorker();
 }
 
 const rootEl = document.getElementById('root');
@@ -32,10 +29,8 @@ if (!rootEl) {
     </StrictMode>,
   );
 
-  // Defer non-critical startup work so first paint stays fast
   const boot = () => {
     initPwa();
-    initUpdateChecker();
   };
 
   if ('requestIdleCallback' in window) {
