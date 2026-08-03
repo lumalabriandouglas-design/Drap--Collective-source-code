@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Conversation, Message, Profile, Product } from '../../types/supabase';
@@ -12,8 +12,6 @@ import {
   Bell,
   BellOff,
   Paperclip,
-  Image as ImageIcon,
-  X,
   ExternalLink,
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
@@ -24,7 +22,13 @@ import {
   getSubscription,
 } from '../../lib/pushNotifications';
 
-/* ───────── Avatar helper ───────── */
+type ConversationRow = Conversation & {
+  otherUser?: Profile;
+  lastMessage?: string | null;
+  lastMessageAt?: string | null;
+};
+
+/* ───────── Avatar ───────── */
 function Avatar({
   name,
   url,
@@ -62,30 +66,30 @@ function Avatar({
   );
 }
 
-/* ───────── Tick status ───────── */
+/* ───────── Read ticks ───────── */
 function TickStatus({ is_read, status }: { is_read: boolean; status: string }) {
   if (is_read || status === 'read') {
     return (
-      <span className="inline-flex items-center gap-[1px] ml-1.5">
-        <CheckCheck size={13} className="text-gold-400" strokeWidth={2.5} />
+      <span className="inline-flex items-center ml-1">
+        <CheckCheck size={12} className="text-gold-400" strokeWidth={2.5} />
       </span>
     );
   }
   if (status === 'delivered') {
     return (
-      <span className="inline-flex items-center gap-[1px] ml-1.5">
-        <CheckCheck size={13} className="text-charcoal-300/60" strokeWidth={2.5} />
+      <span className="inline-flex items-center ml-1">
+        <CheckCheck size={12} className="text-charcoal-300/60" strokeWidth={2.5} />
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center ml-1.5">
-      <Check size={13} className="text-charcoal-300/40" strokeWidth={2.5} />
+    <span className="inline-flex items-center ml-1">
+      <Check size={12} className="text-charcoal-300/40" strokeWidth={2.5} />
     </span>
   );
 }
 
-/* ───────── Timestamp formatter ───────── */
+/* ───────── Time helpers ───────── */
 function formatTime(iso: string) {
   const d = new Date(iso);
   const now = new Date();
@@ -94,64 +98,65 @@ function formatTime(iso: string) {
     d.getMonth() === now.getMonth() &&
     d.getDate() === now.getDate();
 
-  const time = d.toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   if (sameDay) return time;
 
-  const date = d.toLocaleDateString([], {
-    month: 'short',
-    day: 'numeric',
-  });
-  return `${date} ${time}`;
+  const date = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return `${date}`;
 }
 
-/* ───────── Product Reference Card ───────── */
-function ProductReferenceCard({ product }: { product: Product }) {
+function formatListTime(iso?: string | null) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) {
+    return d.toLocaleDateString([], { weekday: 'short' });
+  }
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+/* ───────── Compact product chip ───────── */
+function ProductChip({ product }: { product: Product }) {
   const navigate = useNavigate();
   return (
-    <div className="flex items-center gap-3 p-3 rounded-xl border border-gold-200/50 bg-gold-50/40 max-w-sm">
-      <div className="w-14 h-16 rounded-lg overflow-hidden bg-ivory-200 flex-shrink-0">
-        <img
-          src={product.image_urls?.[0] || ''}
-          alt={product.name}
-          className="w-full h-full object-cover"
-        />
+    <button
+      type="button"
+      onClick={() => navigate(`/product/${product.id}`)}
+      className="flex items-center gap-2.5 w-full max-w-sm p-2 rounded-xl border border-gold-200/60 bg-gold-50/50 text-left hover:border-gold-300 transition-colors cursor-pointer"
+    >
+      <div className="w-11 h-12 rounded-lg overflow-hidden bg-ivory-200 flex-shrink-0">
+        {product.image_urls?.[0] ? (
+          <img
+            src={product.image_urls[0]}
+            alt={product.name}
+            className="w-full h-full object-cover"
+          />
+        ) : null}
       </div>
       <div className="min-w-0 flex-1">
+        <p className="text-[10px] uppercase tracking-wider text-charcoal-400 mb-0.5">
+          About this piece
+        </p>
         <p className="text-xs font-medium text-charcoal-700 truncate">{product.name}</p>
-        {product.price != null && (
-          <p className="text-xs text-gold-600 mt-0.5 font-medium">
-            {new Intl.NumberFormat('en-UG', {
-              style: 'currency',
-              currency: 'UGX',
-              maximumFractionDigits: 0,
-            }).format(product.price)}
-          </p>
-        )}
-        <button
-          onClick={() => navigate(`/product/${product.id}`)}
-          className="inline-flex items-center gap-1 mt-1.5 text-[10px] text-charcoal-400 hover:text-primary transition-colors"
-        >
-          <ExternalLink size={10} /> View Piece
-        </button>
       </div>
-    </div>
+      <ExternalLink size={12} className="text-charcoal-300 shrink-0" />
+    </button>
   );
 }
 
-/* ───────── Main Messages Page ───────── */
+/* ───────── Main page ───────── */
 export default function Messages() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const [conversations, setConversations] = useState<
-    (Conversation & { otherUser?: Profile })[]
-  >([]);
-  const [activeConversation, setActiveConversation] =
-    useState<Conversation | null>(null);
+  const [conversations, setConversations] = useState<ConversationRow[]>([]);
+  const [activeConversation, setActiveConversation] = useState<ConversationRow | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -161,22 +166,25 @@ export default function Messages() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [pushEnabled, setPushEnabled] = useState(false);
-  const [showPushBanner, setShowPushBanner] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
   const [contextProduct, setContextProduct] = useState<Product | null>(null);
-  const contextInjectedRef = useRef(false);
 
   useEffect(() => {
     if (user) loadConversations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  /* ── Load context product if ?product= param present ── */
+  /* Context product from ?product= */
   useEffect(() => {
     const productId = searchParams.get('product');
-    if (!productId) return;
+    if (!productId) {
+      setContextProduct(null);
+      return;
+    }
     supabase
       .from('products')
       .select('*')
@@ -187,7 +195,7 @@ export default function Messages() {
       });
   }, [searchParams]);
 
-  /* ── Realtime message subscription ── */
+  /* Realtime for active chat */
   useEffect(() => {
     if (!activeConversation || !user) return;
     const channel = supabase
@@ -202,11 +210,30 @@ export default function Messages() {
         },
         (payload) => {
           const msg = payload.new as Message;
-          setMessages((prev) => [...prev, msg]);
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === msg.id)) return prev;
+            return [...prev, msg];
+          });
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === activeConversation.id
+                ? {
+                    ...c,
+                    lastMessage: msg.content,
+                    lastMessageAt: msg.created_at,
+                    updated_at: msg.created_at,
+                  }
+                : c,
+            ),
+          );
           if (msg.sender_id !== user.id) {
             supabase
               .from('messages')
-              .update({ read_at: new Date().toISOString(), status: 'read', is_read: true })
+              .update({
+                read_at: new Date().toISOString(),
+                status: 'read',
+                is_read: true,
+              })
               .eq('id', msg.id)
               .then();
           }
@@ -233,6 +260,40 @@ export default function Messages() {
     };
   }, [activeConversation, user]);
 
+  async function enrichConversation(conv: Conversation): Promise<ConversationRow> {
+    const otherId = conv.participant_ids.find((id) => id !== user!.id);
+    let otherUser: Profile | undefined;
+    if (otherId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', otherId)
+        .single();
+      otherUser = profile || undefined;
+    }
+
+    const { data: lastMsgs } = await supabase
+      .from('messages')
+      .select('content, created_at, image_urls')
+      .eq('conversation_id', conv.id)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const last = lastMsgs?.[0];
+    const lastMessage = last
+      ? last.image_urls && last.image_urls.length > 0 && (!last.content || last.content === '(Image)')
+        ? 'Photo'
+        : last.content
+      : null;
+
+    return {
+      ...conv,
+      otherUser,
+      lastMessage,
+      lastMessageAt: last?.created_at || conv.updated_at,
+    };
+  }
+
   async function loadConversations() {
     setLoading(true);
     const { data } = await supabase
@@ -240,25 +301,12 @@ export default function Messages() {
       .select('*')
       .contains('participant_ids', [user!.id])
       .order('updated_at', { ascending: false });
+
     const convs = data || [];
-    const withUsers = await Promise.all(
-      convs.map(async (conv) => {
-        const otherId = conv.participant_ids.find((id) => id !== user!.id);
-        if (otherId) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('user_id', otherId)
-            .single();
-          return { ...conv, otherUser: profile || undefined };
-        }
-        return conv;
-      }),
-    );
+    const withUsers = await Promise.all(convs.map((c) => enrichConversation(c)));
     setConversations(withUsers);
     setLoading(false);
 
-    // Fetch unread counts
     const ids = convs.map((c) => c.id);
     if (ids.length > 0) {
       const { data: unreadMsgs } = await supabase
@@ -270,59 +318,36 @@ export default function Messages() {
 
       const countMap: Record<string, number> = {};
       (unreadMsgs || []).forEach((m) => {
-        countMap[m.conversation_id] =
-          (countMap[m.conversation_id] || 0) + 1;
+        countMap[m.conversation_id] = (countMap[m.conversation_id] || 0) + 1;
       });
       setUnreadCounts(countMap);
     }
 
-    // Handle designer param
     const designerId = searchParams.get('designer');
     if (designerId) {
-      const existing = withUsers.find((c) =>
-        c.participant_ids.includes(designerId),
-      );
+      const existing = withUsers.find((c) => c.participant_ids.includes(designerId));
       if (existing) {
         setActiveConversation(existing);
         loadMessages(existing.id);
         setShowMobileChat(true);
       } else if (user) {
-        // Create a new conversation with the designer
         const { data: newConv } = await supabase
           .from('conversations')
-          .insert({
-            participant_ids: [user.id, designerId],
-          })
+          .insert({ participant_ids: [user.id, designerId] })
           .select()
           .single();
 
         if (newConv) {
-          const otherId = newConv.participant_ids.find((id) => id !== user.id);
-          let otherProfile: Profile | undefined;
-          if (otherId) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('user_id', otherId)
-              .single();
-            otherProfile = profile || undefined;
-          }
-          const enriched = { ...newConv, otherUser: otherProfile };
+          const enriched = await enrichConversation(newConv);
           setConversations((prev) => [enriched, ...prev]);
           setActiveConversation(enriched);
           setShowMobileChat(true);
-
-          // Don't auto-insert — the product reference card renders above
         }
       }
-    } else if (withUsers.length > 0 && !activeConversation) {
-      setActiveConversation(withUsers[0]);
-      loadMessages(withUsers[0].id);
     }
   }
 
   async function loadMessages(conversationId: string) {
-    // Mark sent as delivered
     await supabase
       .from('messages')
       .update({ status: 'delivered' })
@@ -330,10 +355,13 @@ export default function Messages() {
       .neq('sender_id', user!.id)
       .eq('status', 'sent');
 
-    // Mark unread as read
     await supabase
       .from('messages')
-      .update({ read_at: new Date().toISOString(), status: 'read', is_read: true })
+      .update({
+        read_at: new Date().toISOString(),
+        status: 'read',
+        is_read: true,
+      })
       .eq('conversation_id', conversationId)
       .neq('sender_id', user!.id)
       .is('read_at', null);
@@ -346,12 +374,11 @@ export default function Messages() {
     setMessages(data || []);
   }
 
-  function handleSelectConversation(conv: Conversation & { otherUser?: Profile }) {
+  function handleSelectConversation(conv: ConversationRow) {
     setActiveConversation(conv);
     loadMessages(conv.id);
     setShowMobileChat(true);
     setUnreadCounts((prev) => ({ ...prev, [conv.id]: 0 }));
-    contextInjectedRef.current = true; // Prevent injection on manual selection
   }
 
   function handleBack() {
@@ -360,30 +387,39 @@ export default function Messages() {
 
   async function sendMessage() {
     if (!user || !activeConversation || !newMessage.trim()) return;
+    const content = newMessage.trim();
+    setNewMessage('');
     const { error } = await supabase.from('messages').insert({
       conversation_id: activeConversation.id,
       sender_id: user.id,
-      content: newMessage.trim(),
+      content,
     });
     if (!error) {
-      setNewMessage('');
-      // bump updated_at so conversation rises to top
+      const now = new Date().toISOString();
       await supabase
         .from('conversations')
-        .update({ updated_at: new Date().toISOString() })
+        .update({ updated_at: now })
         .eq('id', activeConversation.id);
+      setConversations((prev) => {
+        const next = prev.map((c) =>
+          c.id === activeConversation.id
+            ? { ...c, lastMessage: content, lastMessageAt: now, updated_at: now }
+            : c,
+        );
+        return next.sort(
+          (a, b) =>
+            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+        );
+      });
     }
   }
 
-  /* ── Upload image attachment ── */
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !user || !activeConversation) return;
 
     setUploadingImage(true);
-
     try {
-      // Compress
       const imageCompression = (await import('browser-image-compression')).default;
       const compressed = await imageCompression(file, {
         maxSizeMB: 0.5,
@@ -406,7 +442,6 @@ export default function Messages() {
           .getPublicUrl(filePath);
         publicUrl = urlData.publicUrl;
       } else {
-        // Fallback: upload original
         const fallbackName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
         const fallbackPath = `${activeConversation.id}/${fallbackName}`;
         const { error: fallbackError } = await supabase.storage
@@ -421,6 +456,7 @@ export default function Messages() {
       }
 
       if (publicUrl) {
+        const now = new Date().toISOString();
         await supabase.from('messages').insert({
           conversation_id: activeConversation.id,
           sender_id: user.id,
@@ -429,156 +465,133 @@ export default function Messages() {
         });
         await supabase
           .from('conversations')
-          .update({ updated_at: new Date().toISOString() })
+          .update({ updated_at: now })
           .eq('id', activeConversation.id);
+        setConversations((prev) => {
+          const next = prev.map((c) =>
+            c.id === activeConversation.id
+              ? { ...c, lastMessage: 'Photo', lastMessageAt: now, updated_at: now }
+              : c,
+          );
+          return next.sort(
+            (a, b) =>
+              new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+          );
+        });
       }
     } catch (err) {
       console.error('[Messages] Image upload failed:', err);
     }
 
     setUploadingImage(false);
-    // Reset so the same file can be picked again
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  /* ── Push notification setup ── */
   useEffect(() => {
     if (!user) return;
-
     async function checkPush() {
       if (!isPushSupported()) return;
-
       const sub = await getSubscription();
       if (sub) {
         setPushEnabled(true);
         return;
       }
-
       if (Notification.permission === 'granted') {
         const ok = await setupPush();
         setPushEnabled(ok);
-      } else if (Notification.permission === 'default') {
-        setShowPushBanner(true);
       }
     }
-
     checkPush();
   }, [user]);
 
-  async function handleEnablePush() {
-    const ok = await setupPush();
-    setPushEnabled(ok);
-    setShowPushBanner(false);
+  async function togglePush() {
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (pushEnabled) {
+        await unsubscribeFromPush();
+        setPushEnabled(false);
+      } else {
+        const ok = await setupPush();
+        setPushEnabled(ok);
+      }
+    } finally {
+      setPushBusy(false);
+    }
   }
 
-  async function handleDisablePush() {
-    await unsubscribeFromPush();
-    setPushEnabled(false);
-  }
-
-  const activeConv = activeConversation as (Conversation & { otherUser?: Profile }) | null;
+  const activeConv = activeConversation;
 
   return (
     <>
       <Helmet>
         <title>Messages — Drapé Collective</title>
       </Helmet>
-      {/*
-        dvh-based height ensures proper viewport fit on mobile (addresses
-        browser chrome collapsing/expanding). The 5rem accounts for the
-        fixed navbar (h-16 = 64px ~ 4rem) plus 1rem safe buffer.
-      */}
-      <div className="h-[calc(100dvh-5rem)] flex flex-col">
-        {/* ════ Push notification banner ════ */}
-        {showPushBanner && (
-          <div className="shrink-0 px-4 py-3 sm:px-6 bg-gold-50 border-b border-gold-200/60 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <Bell size={16} className="text-gold-500 shrink-0" />
-              <p className="text-xs sm:text-sm text-charcoal-600">
-                Get notified when designers reply — enable push notifications
-              </p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={handleEnablePush}
-                className="text-xs font-medium px-3 py-1.5 rounded-full bg-gold-500 text-white hover:bg-gold-600 active:scale-95 transition-all duration-200 cursor-pointer"
-              >
-                Enable
-              </button>
-              <button
-                onClick={() => setShowPushBanner(false)}
-                className="text-xs text-charcoal-400 hover:text-charcoal-600 transition-colors cursor-pointer"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        )}
 
-        {pushEnabled && (
-          <div className="shrink-0 px-4 py-2 sm:px-6 bg-ivory-50/80 border-b border-border/50 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bell size={13} className="text-green-600" />
-              <span className="text-[11px] text-charcoal-400">
-                Push notifications active
-              </span>
-            </div>
-            <button
-              onClick={handleDisablePush}
-              className="flex items-center gap-1 text-[11px] text-charcoal-300 hover:text-charcoal-500 transition-colors cursor-pointer"
-              aria-label="Disable push notifications"
-            >
-              <BellOff size={12} />
-              <span>Mute</span>
-            </button>
-          </div>
-        )}
-
-        {/* ════ Main layout ════ */}
+      <div className="h-[calc(100dvh-4.5rem)] flex flex-col bg-surface">
         <div className="flex flex-1 min-h-0">
-          {/* ════ Sidebar ════ */}
+          {/* Sidebar */}
           <div
             className={`w-full lg:w-80 xl:w-96 border-r border-border flex flex-col bg-surface ${
               showMobileChat ? 'hidden lg:flex' : 'flex'
             }`}
           >
-            <div className="p-4 sm:p-5 border-b border-border">
-              <h2 className="font-heading text-lg font-semibold text-charcoal-700">
-                Messages
-              </h2>
-              <p className="text-xs text-charcoal-300 mt-0.5">
-                Connect with designers
-              </p>
+            <div className="px-4 sm:px-5 py-4 border-b border-border flex items-center justify-between gap-3 shrink-0">
+              <div className="min-w-0">
+                <h1 className="font-heading text-lg font-semibold text-charcoal-700">
+                  Messages
+                </h1>
+                <p className="text-[11px] text-charcoal-300 mt-0.5">
+                  Chat with designers
+                </p>
+              </div>
+              {isPushSupported() && (
+                <button
+                  type="button"
+                  onClick={togglePush}
+                  disabled={pushBusy}
+                  className={`p-2 rounded-full transition-colors cursor-pointer ${
+                    pushEnabled
+                      ? 'text-gold-600 bg-gold-50 hover:bg-gold-100'
+                      : 'text-charcoal-300 hover:text-charcoal-500 hover:bg-ivory-100'
+                  }`}
+                  title={pushEnabled ? 'Mute notifications' : 'Enable notifications'}
+                  aria-label={pushEnabled ? 'Mute notifications' : 'Enable notifications'}
+                >
+                  {pushEnabled ? <Bell size={16} /> : <BellOff size={16} />}
+                </button>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto">
               {loading ? (
-                <div className="p-4 space-y-3">
-                  {Array.from({ length: 4 }).map((_, i) => (
+                <div className="p-3 space-y-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
                     <div
                       key={i}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-ivory-50 animate-pulse"
+                      className="flex items-center gap-3 p-3 rounded-xl animate-pulse"
                     >
-                      <div className="w-10 h-10 rounded-full bg-ivory-200" />
+                      <div className="w-11 h-11 rounded-full bg-ivory-200" />
                       <div className="flex-1 space-y-2">
-                        <div className="h-3 w-3/4 bg-ivory-200 rounded" />
-                        <div className="h-2 w-1/2 bg-ivory-200 rounded" />
+                        <div className="h-3 w-2/3 bg-ivory-200 rounded" />
+                        <div className="h-2.5 w-full bg-ivory-100 rounded" />
                       </div>
                     </div>
                   ))}
                 </div>
               ) : conversations.length === 0 ? (
-                <div className="p-8 text-center text-sm text-charcoal-300">
-                  <MessageCircle
-                    size={36}
-                    className="mx-auto mb-3 text-charcoal-200"
-                  />
-                  <p className="font-medium text-charcoal-400">
-                    No conversations yet
+                <div className="px-6 py-16 text-center">
+                  <MessageCircle size={32} className="mx-auto mb-3 text-charcoal-200" />
+                  <p className="text-sm font-medium text-charcoal-500">No conversations yet</p>
+                  <p className="mt-1.5 text-xs text-charcoal-300 max-w-[220px] mx-auto leading-relaxed">
+                    Open a product and tap Message designer to start a thread.
                   </p>
-                  <p className="mt-1 text-xs">
-                    Message a designer from a product page
-                  </p>
+                  <Link
+                    to="/explore"
+                    className="inline-block mt-5 text-xs tracking-wide uppercase text-gold-600 hover:text-gold-700"
+                  >
+                    Explore pieces
+                  </Link>
                 </div>
               ) : (
                 conversations.map((conv) => {
@@ -591,37 +604,51 @@ export default function Messages() {
                   return (
                     <button
                       key={conv.id}
+                      type="button"
                       onClick={() => handleSelectConversation(conv)}
-                      className={`w-full text-left p-3 sm:p-4 flex items-center gap-3 transition-all duration-200 border-l-2 cursor-pointer ${
+                      className={`w-full text-left px-3 sm:px-4 py-3 flex items-start gap-3 transition-colors border-l-2 cursor-pointer ${
                         isActive
                           ? 'bg-ivory-50 border-l-gold-400'
-                          : 'border-l-transparent hover:bg-ivory-50/50'
+                          : 'border-l-transparent hover:bg-ivory-50/70'
                       }`}
                     >
                       <Avatar
                         name={otherName}
                         url={conv.otherUser?.profile_photo_url}
-                        size="w-11 h-11 sm:w-12 sm:h-12"
+                        size="w-11 h-11"
                       />
-                      <div className="min-w-0 flex-1 flex items-center gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-charcoal-700 truncate">
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <p
+                            className={`text-sm truncate ${
+                              unread > 0
+                                ? 'font-semibold text-charcoal-800'
+                                : 'font-medium text-charcoal-700'
+                            }`}
+                          >
                             {otherName}
                           </p>
-                          {conv.otherUser?.location && (
-                            <p className="text-[11px] text-charcoal-300 truncate mt-0.5">
-                              {conv.otherUser.location}
-                            </p>
+                          <span className="text-[10px] text-charcoal-300 shrink-0 tabular-nums">
+                            {formatListTime(conv.lastMessageAt || conv.updated_at)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p
+                            className={`text-xs truncate flex-1 ${
+                              unread > 0 ? 'text-charcoal-600' : 'text-charcoal-400'
+                            }`}
+                          >
+                            {conv.lastMessage || 'No messages yet'}
+                          </p>
+                          {unread > 0 && (
+                            <span
+                              className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-gold-500 text-white text-[10px] font-semibold"
+                              aria-label={`${unread} unread`}
+                            >
+                              {unread > 9 ? '9+' : unread}
+                            </span>
                           )}
                         </div>
-                        {unread > 0 && (
-                          <span
-                            className="inline-flex items-center justify-center w-5 h-5 min-w-5 rounded-full bg-gold-500 text-white text-[10px] font-semibold leading-none shadow-[0_2px_6px_rgba(201,169,110,0.35)]"
-                            aria-label={`${unread} unread message${unread !== 1 ? 's' : ''}`}
-                          >
-                            {unread > 9 ? '9+' : unread}
-                          </span>
-                        )}
                       </div>
                     </button>
                   );
@@ -630,32 +657,31 @@ export default function Messages() {
             </div>
           </div>
 
-          {/* ════ Chat area ════ */}
+          {/* Chat pane */}
           <div
-            className={`flex-1 flex flex-col bg-surface ${
+            className={`flex-1 flex flex-col bg-surface min-w-0 ${
               !showMobileChat ? 'hidden lg:flex' : 'flex'
             }`}
           >
             {activeConv ? (
               <>
-                {/* ── Chat header ── */}
-                <div className="flex items-center gap-3 px-4 py-3 sm:px-6 sm:py-4 border-b border-border shrink-0">
+                <div className="flex items-center gap-3 px-3 sm:px-5 py-3 border-b border-border shrink-0">
                   <button
+                    type="button"
                     onClick={handleBack}
-                    className="lg:hidden p-1 -ml-1 rounded-full hover:bg-ivory-100 transition-colors text-charcoal-500 cursor-pointer"
+                    className="lg:hidden p-1.5 -ml-1 rounded-full hover:bg-ivory-100 text-charcoal-500 cursor-pointer"
                     aria-label="Back to conversations"
                   >
                     <ChevronLeft size={20} />
                   </button>
                   <Avatar
                     name={
-                      activeConv.otherUser?.brand_name ||
-                      activeConv.otherUser?.username
+                      activeConv.otherUser?.brand_name || activeConv.otherUser?.username
                     }
                     url={activeConv.otherUser?.profile_photo_url}
-                    size="w-9 h-9 sm:w-10 sm:h-10"
+                    size="w-9 h-9"
                   />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-charcoal-700 truncate">
                       {activeConv.otherUser?.brand_name ||
                         activeConv.otherUser?.username ||
@@ -667,68 +693,75 @@ export default function Messages() {
                       </p>
                     )}
                   </div>
+                  {activeConv.otherUser?.id && (
+                    <Link
+                      to={`/showroom/${activeConv.otherUser.id}`}
+                      className="hidden sm:inline-flex text-[11px] tracking-wide uppercase text-charcoal-400 hover:text-gold-600 transition-colors"
+                    >
+                      Showroom
+                    </Link>
+                  )}
                 </div>
 
-                {/* ── Messages ── */}
-                <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-5">
-                  {/* Context product reference card — shown persistently when user navigated from a product page */}
+                <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-4 space-y-3">
                   {contextProduct && (
-                    <div className="flex justify-start">
-                      <div>
-                        <div className="inline-block px-4 py-3 bg-ivory-100 text-charcoal-700 rounded-2xl rounded-bl-none text-sm">
-                          <p className="text-[11px] text-charcoal-400 mb-2 font-medium tracking-wide uppercase">
-                            Inquiring about
-                          </p>
-                          <ProductReferenceCard product={contextProduct} />
-                        </div>
-                        <p className="mt-1 text-[11px] text-charcoal-300/70 pl-1">
-                          {formatTime(new Date().toISOString())}
-                        </p>
-                      </div>
+                    <div className="pb-2">
+                      <ProductChip product={contextProduct} />
+                    </div>
+                  )}
+
+                  {messages.length === 0 && !contextProduct && (
+                    <div className="py-12 text-center">
+                      <p className="text-xs text-charcoal-300">
+                        Say hello — introduce yourself or ask about a piece.
+                      </p>
                     </div>
                   )}
 
                   {messages.map((msg) => {
                     const isOutgoing = msg.sender_id === user!.id;
+                    const isImageOnly =
+                      msg.image_urls &&
+                      msg.image_urls.length > 0 &&
+                      (!msg.content || msg.content === '(Image)');
                     return (
                       <div
                         key={msg.id}
                         className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}
                       >
-                        <div className="max-w-[85%] sm:max-w-[75%] lg:max-w-[65%]">
-                          {/* Bubble */}
+                        <div className="max-w-[85%] sm:max-w-[70%]">
                           <div
-                            className={`inline-block px-4 py-3 text-sm leading-relaxed ${
+                            className={`inline-block px-3.5 py-2.5 text-sm leading-relaxed ${
                               isOutgoing
-                                ? 'bg-charcoal-700 text-white rounded-2xl rounded-br-none'
-                                : 'bg-ivory-100 text-charcoal-700 rounded-2xl rounded-bl-none'
+                                ? 'bg-charcoal-700 text-white rounded-2xl rounded-br-md'
+                                : 'bg-ivory-100 text-charcoal-700 rounded-2xl rounded-bl-md'
                             }`}
                           >
-                            {/* Render image attachment if present */}
                             {msg.image_urls && msg.image_urls.length > 0 && (
-                              <div className="-mx-1 -mt-1 mb-2 space-y-2">
+                              <div className={`${isImageOnly ? '' : 'mb-2'} space-y-1.5`}>
                                 {msg.image_urls.map((url, i) => (
                                   <div
                                     key={i}
-                                    className="rounded-lg overflow-hidden bg-black/5"
+                                    className="rounded-lg overflow-hidden bg-black/5 -mx-0.5"
                                   >
                                     <img
                                       src={url}
-                                      alt="Attached image"
-                                      className="w-full max-h-64 object-cover rounded-lg"
+                                      alt="Attachment"
+                                      className="w-full max-h-56 object-cover"
                                       loading="lazy"
                                     />
                                   </div>
                                 ))}
                               </div>
                             )}
-                            <p className="inline">{msg.content}</p>
+                            {!isImageOnly && msg.content && <p>{msg.content}</p>}
                           </div>
-                          {/* Timestamp + Tick status */}
                           <p
-                            className={`mt-1 text-[11px] tracking-wide flex items-center ${
-                              isOutgoing ? 'justify-end pr-1' : 'justify-start pl-1'
-                            } text-charcoal-300/70`}
+                            className={`mt-1 text-[10px] flex items-center gap-0.5 ${
+                              isOutgoing
+                                ? 'justify-end text-charcoal-300'
+                                : 'justify-start text-charcoal-300'
+                            }`}
                           >
                             <span>{formatTime(msg.created_at)}</span>
                             {isOutgoing && (
@@ -745,16 +778,14 @@ export default function Messages() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* ── Input bar — locked at bottom ── */}
-                <div className="shrink-0 px-3 sm:px-6 py-3 sm:py-4 border-t border-border bg-surface">
+                <div className="shrink-0 px-3 sm:px-5 py-3 border-t border-border bg-surface pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
                       sendMessage();
                     }}
-                    className="flex items-center gap-2 bg-ivory-50 border border-border/80 rounded-2xl pl-3 pr-2 py-2 focus-within:border-gold-300/50 focus-within:shadow-[0_0_0_2px_rgba(201,169,110,0.12)] transition-all duration-300"
+                    className="flex items-center gap-1.5 bg-ivory-50 border border-border/80 rounded-2xl pl-2 pr-1.5 py-1.5 focus-within:border-gold-300/50 focus-within:ring-2 focus-within:ring-gold-200/40 transition-all"
                   >
-                    {/* Hidden file input for image attachment */}
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -763,13 +794,11 @@ export default function Messages() {
                       className="hidden"
                       aria-label="Attach an image"
                     />
-
-                    {/* Paperclip / media attachment button */}
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingImage}
-                      className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full text-charcoal-300 hover:text-charcoal-500 hover:bg-ivory-200 transition-all duration-200 disabled:opacity-40 cursor-pointer"
+                      className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full text-charcoal-300 hover:text-charcoal-500 hover:bg-ivory-200 transition-all disabled:opacity-40 cursor-pointer"
                       aria-label="Attach image"
                     >
                       {uploadingImage ? (
@@ -778,18 +807,17 @@ export default function Messages() {
                         <Paperclip size={17} />
                       )}
                     </button>
-
                     <input
                       type="text"
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
-                      placeholder="Type a message..."
-                      className="flex-1 bg-transparent text-sm text-charcoal-700 placeholder:text-charcoal-300/50 focus:outline-none min-w-0"
+                      placeholder="Type a message…"
+                      className="flex-1 bg-transparent text-sm text-charcoal-700 placeholder:text-charcoal-300/60 focus:outline-none min-w-0 py-2"
                     />
                     <button
                       type="submit"
                       disabled={!newMessage.trim() || uploadingImage}
-                      className="w-9 h-9 flex items-center justify-center rounded-full bg-charcoal-700 text-white hover:bg-charcoal-800 active:scale-95 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      className="w-9 h-9 flex items-center justify-center rounded-full bg-charcoal-700 text-white hover:bg-charcoal-800 active:scale-95 transition-all disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer"
                       aria-label="Send message"
                     >
                       <Send size={15} />
@@ -798,15 +826,16 @@ export default function Messages() {
                 </div>
               </>
             ) : (
-              /* ── Empty state ── */
-              <div className="flex-1 flex items-center justify-center text-center p-8">
+              <div className="flex-1 flex items-center justify-center p-8 text-center">
                 <div>
-                  <MessageCircle
-                    size={48}
-                    className="mx-auto text-charcoal-200 mb-4"
-                  />
-                  <p className="text-sm text-charcoal-300">
-                    Select a conversation to start chatting
+                  <div className="w-14 h-14 rounded-full bg-ivory-100 flex items-center justify-center mx-auto mb-4">
+                    <MessageCircle size={24} className="text-charcoal-300" />
+                  </div>
+                  <p className="text-sm font-medium text-charcoal-500">
+                    Select a conversation
+                  </p>
+                  <p className="mt-1.5 text-xs text-charcoal-300 max-w-xs mx-auto">
+                    Choose a thread on the left, or message a designer from any product page.
                   </p>
                 </div>
               </div>
