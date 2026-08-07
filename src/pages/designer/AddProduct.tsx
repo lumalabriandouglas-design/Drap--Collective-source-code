@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
-import { X, ImagePlus, ChevronDown, ChevronUp, ArrowLeft, Loader2 } from 'lucide-react';
+import { X, ImagePlus, ChevronDown, ChevronUp, ArrowLeft, Loader2, Trash2 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { compressImage } from '../../lib/compressImage';
 
@@ -42,6 +42,120 @@ const EMPTY_FORM: FormData = {
   tags: '',
 };
 
+const DRAFT_KEY = 'drape:product-draft';
+const DRAFT_DB = 'drape-product-drafts';
+const DRAFT_STORE = 'images';
+
+/* ─── IndexedDB helpers for image File blobs ─── */
+function openDraftDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DRAFT_DB, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(DRAFT_STORE)) {
+        db.createObjectStore(DRAFT_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveDraftImages(files: File[]): Promise<void> {
+  const db = await openDraftDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DRAFT_STORE, 'readwrite');
+    const store = tx.objectStore(DRAFT_STORE);
+    store.clear();
+    files.forEach((file, i) => {
+      store.put(
+        {
+          blob: file,
+          name: file.name,
+          type: file.type,
+          lastModified: file.lastModified,
+        },
+        i,
+      );
+    });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function loadDraftImages(): Promise<File[]> {
+  try {
+    const db = await openDraftDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(DRAFT_STORE, 'readonly');
+      const store = tx.objectStore(DRAFT_STORE);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        const rows = (req.result || []) as {
+          blob: Blob;
+          name: string;
+          type: string;
+          lastModified: number;
+        }[];
+        const files = rows.map(
+          (r) => new File([r.blob], r.name, { type: r.type, lastModified: r.lastModified }),
+        );
+        resolve(files);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function clearDraftImages(): Promise<void> {
+  try {
+    const db = await openDraftDb();
+    return new Promise((resolve) => {
+      const tx = db.transaction(DRAFT_STORE, 'readwrite');
+      tx.objectStore(DRAFT_STORE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    });
+  } catch {
+    // ignore
+  }
+}
+
+type TextDraft = {
+  form: FormData;
+  existingImages: string[];
+  showMore: boolean;
+  savedAt: string;
+};
+
+function loadTextDraft(): TextDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as TextDraft;
+  } catch {
+    return null;
+  }
+}
+
+function saveTextDraft(draft: TextDraft): void {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // quota / private mode
+  }
+}
+
+function clearTextDraft(): void {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export default function AddProduct() {
   const { profile, user } = useAuth();
   const userId = user?.id;
@@ -60,10 +174,82 @@ export default function AddProduct() {
   const [error, setError] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [draftBanner, setDraftBanner] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const skipNextSave = useRef(true);
 
+  /* Load edit product OR restore local draft */
   useEffect(() => {
-    if (editId) loadProduct(editId);
+    let cancelled = false;
+
+    async function boot() {
+      if (editId) {
+        await loadProduct(editId);
+        if (!cancelled) setDraftReady(true);
+        return;
+      }
+
+      const text = loadTextDraft();
+      const files = await loadDraftImages();
+      if (cancelled) return;
+
+      if (text || files.length > 0) {
+        if (text) {
+          setForm(text.form || EMPTY_FORM);
+          setExistingImages(text.existingImages || []);
+          setShowMore(!!text.showMore);
+        }
+        if (files.length > 0) {
+          setImages(files);
+          setImagePreviews(files.map((f) => URL.createObjectURL(f)));
+        }
+        const when = text?.savedAt
+          ? new Date(text.savedAt).toLocaleString([], {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : 'recently';
+        setDraftBanner(`Draft restored · saved ${when}`);
+      }
+      setDraftReady(true);
+      setTimeout(() => {
+        skipNextSave.current = false;
+      }, 400);
+    }
+
+    boot();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId]);
+
+  /* Auto-save draft (new pieces only) */
+  useEffect(() => {
+    if (editId || !draftReady || skipNextSave.current) return;
+
+    const timer = setTimeout(() => {
+      saveTextDraft({
+        form,
+        existingImages,
+        showMore,
+        savedAt: new Date().toISOString(),
+      });
+      void saveDraftImages(images);
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [form, images, existingImages, showMore, editId, draftReady]);
+
+  /* Cleanup object URLs on unmount */
+  useEffect(() => {
+    return () => {
+      imagePreviews.forEach((url) => URL.revokeObjectURL(url));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function loadProduct(id: string) {
     const { data } = await supabase.from('products').select('*').eq('id', id).single();
@@ -104,13 +290,33 @@ export default function AddProduct() {
   }
 
   function removeImage(index: number) {
-    URL.revokeObjectURL(imagePreviews[index]);
+    setImagePreviews((prev) => {
+      const url = prev[index];
+      if (url) URL.revokeObjectURL(url);
+      return prev.filter((_, i) => i !== index);
+    });
     setImages((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
   }
 
   function removeExistingImage(url: string) {
     setExistingImages((prev) => prev.filter((u) => u !== url));
+  }
+
+  async function discardDraft() {
+    skipNextSave.current = true;
+    clearTextDraft();
+    await clearDraftImages();
+    imagePreviews.forEach((url) => URL.revokeObjectURL(url));
+    setForm(EMPTY_FORM);
+    setImages([]);
+    setImagePreviews([]);
+    setExistingImages([]);
+    setShowMore(false);
+    setDraftBanner(null);
+    setError(null);
+    setTimeout(() => {
+      skipNextSave.current = false;
+    }, 400);
   }
 
   const totalImages = existingImages.length + images.length;
@@ -147,7 +353,6 @@ export default function AddProduct() {
       let imageUrls = [...existingImages];
       const uploadErrors: string[] = [];
 
-      // Compress
       const compressedFiles: { file: File; name: string }[] = [];
       for (const file of images) {
         try {
@@ -162,7 +367,6 @@ export default function AddProduct() {
       setOptimizing(false);
       setSaving(true);
 
-      // Upload
       for (const { file, name } of compressedFiles) {
         try {
           const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -177,7 +381,9 @@ export default function AddProduct() {
             continue;
           }
 
-          const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(path);
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from('products').getPublicUrl(path);
           imageUrls.push(publicUrl);
         } catch (perFileErr) {
           const msg = perFileErr instanceof Error ? perFileErr.message : 'Unknown error';
@@ -189,6 +395,7 @@ export default function AddProduct() {
         throw new Error(`Image upload failed. ${uploadErrors.slice(0, 2).join('; ')}`);
       }
 
+      // Publish immediately — no moderation queue
       const productData = {
         user_id: profile?.id || userId,
         name: form.name.trim(),
@@ -222,6 +429,11 @@ export default function AddProduct() {
         if (insertError) throw new Error(insertError.message);
       }
 
+      // Clear local draft after successful publish
+      clearTextDraft();
+      await clearDraftImages();
+      skipNextSave.current = true;
+
       navigate('/designer/products');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save product');
@@ -240,25 +452,40 @@ export default function AddProduct() {
       <div className="min-h-screen bg-bg">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
           {/* Header */}
-          <div className="flex items-center gap-4 mb-10">
+          <div className="flex items-center gap-4 mb-6">
             <Link
               to="/designer/products"
               className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-charcoal-400 hover:text-charcoal-700 hover:border-charcoal-300 transition-all"
             >
               <ArrowLeft size={18} />
             </Link>
-            <div>
+            <div className="flex-1 min-w-0">
               <h1 className="font-serif text-2xl sm:text-3xl font-medium text-charcoal-800">
                 {editId ? 'Edit Piece' : 'New Piece'}
               </h1>
               <p className="text-sm text-charcoal-400 mt-0.5">
-                {editId ? 'Update your design' : 'Share something beautiful'}
+                {editId ? 'Update your design' : 'Share something beautiful · draft auto-saves'}
               </p>
             </div>
           </div>
 
+          {/* Draft restored banner */}
+          {draftBanner && !editId && (
+            <div className="mb-6 flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-gold-50 border border-gold-200/60">
+              <p className="text-xs sm:text-sm text-charcoal-600 min-w-0">{draftBanner}</p>
+              <button
+                type="button"
+                onClick={() => void discardDraft()}
+                className="shrink-0 flex items-center gap-1.5 text-xs text-charcoal-400 hover:text-red-600 transition-colors cursor-pointer"
+              >
+                <Trash2 size={13} />
+                Discard
+              </button>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-8">
-            {/* ─── PHOTOS (Primary) ─── */}
+            {/* ─── PHOTOS ─── */}
             <section>
               <div className="flex items-baseline justify-between mb-3">
                 <label className="text-sm font-medium text-charcoal-700">
@@ -269,9 +496,11 @@ export default function AddProduct() {
                 </span>
               </div>
 
-              {/* Drop zone */}
               <div
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
@@ -304,18 +533,25 @@ export default function AddProduct() {
                 />
               </div>
 
-              {/* Previews */}
+              {/* Previews — remove always visible */}
               {totalImages > 0 && (
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-4">
                   {existingImages.map((url, i) => (
-                    <div key={`ex-${i}`} className="relative aspect-[3/4] rounded-xl overflow-hidden bg-ivory-100 group">
+                    <div
+                      key={`ex-${i}`}
+                      className="relative aspect-[3/4] rounded-xl overflow-hidden bg-ivory-100"
+                    >
                       <img src={url} alt="" className="w-full h-full object-cover" />
                       <button
                         type="button"
-                        onClick={() => removeExistingImage(url)}
-                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeExistingImage(url);
+                        }}
+                        className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center shadow-md active:scale-95 hover:bg-red-600 transition-colors cursor-pointer"
+                        aria-label="Remove photo"
                       >
-                        <X size={14} />
+                        <X size={16} strokeWidth={2.5} />
                       </button>
                       {i === 0 && (
                         <span className="absolute bottom-2 left-2 text-[10px] tracking-wider uppercase bg-black/60 text-white px-2 py-0.5 rounded-full">
@@ -325,14 +561,21 @@ export default function AddProduct() {
                     </div>
                   ))}
                   {imagePreviews.map((preview, i) => (
-                    <div key={`new-${i}`} className="relative aspect-[3/4] rounded-xl overflow-hidden bg-ivory-100 group">
+                    <div
+                      key={`new-${i}`}
+                      className="relative aspect-[3/4] rounded-xl overflow-hidden bg-ivory-100"
+                    >
                       <img src={preview} alt="" className="w-full h-full object-cover" />
                       <button
                         type="button"
-                        onClick={() => removeImage(i)}
-                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeImage(i);
+                        }}
+                        className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center shadow-md active:scale-95 hover:bg-red-600 transition-colors cursor-pointer"
+                        aria-label="Remove photo"
                       >
-                        <X size={14} />
+                        <X size={16} strokeWidth={2.5} />
                       </button>
                       {existingImages.length === 0 && i === 0 && (
                         <span className="absolute bottom-2 left-2 text-[10px] tracking-wider uppercase bg-black/60 text-white px-2 py-0.5 rounded-full">
@@ -386,16 +629,16 @@ export default function AddProduct() {
 
             {/* ─── CATEGORY ─── */}
             <section>
-              <label className="block text-sm font-medium text-charcoal-700 mb-3">
-                Category
-              </label>
+              <label className="block text-sm font-medium text-charcoal-700 mb-3">Category</label>
               <div className="flex flex-wrap gap-2">
                 {CATEGORIES.map((cat) => (
                   <button
                     key={cat}
                     type="button"
-                    onClick={() => setForm((f) => ({ ...f, category: f.category === cat ? '' : cat }))}
-                    className={`px-4 py-2 rounded-full text-xs font-medium tracking-wide transition-all ${
+                    onClick={() =>
+                      setForm((f) => ({ ...f, category: f.category === cat ? '' : cat }))
+                    }
+                    className={`px-4 py-2 rounded-full text-xs font-medium tracking-wide transition-all cursor-pointer ${
                       form.category === cat
                         ? 'bg-charcoal-700 text-white'
                         : 'bg-ivory-100 text-charcoal-500 hover:bg-ivory-200'
@@ -406,13 +649,12 @@ export default function AddProduct() {
                 ))}
               </div>
             </section>
-
-            {/* ─── MORE DETAILS (Collapsible) ─── */}
+            {/* ─── MORE DETAILS ─── */}
             <section>
               <button
                 type="button"
                 onClick={() => setShowMore(!showMore)}
-                className="flex items-center justify-between w-full py-3 text-left group"
+                className="flex items-center justify-between w-full py-3 text-left group cursor-pointer"
               >
                 <span className="text-sm font-medium text-charcoal-600 group-hover:text-charcoal-800 transition-colors">
                   Additional details
@@ -462,11 +704,15 @@ export default function AddProduct() {
                   </div>
 
                   <div>
-                    <label className="block text-sm text-charcoal-600 mb-1.5">Artistic Statement</label>
+                    <label className="block text-sm text-charcoal-600 mb-1.5">
+                      Artistic Statement
+                    </label>
                     <textarea
                       rows={2}
                       value={form.artistic_statement}
-                      onChange={(e) => setForm((f) => ({ ...f, artistic_statement: e.target.value }))}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, artistic_statement: e.target.value }))
+                      }
                       placeholder="The story or inspiration behind this piece..."
                       className="w-full px-4 py-3 bg-white border border-border rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-gold-300/40 focus:border-gold-400 transition-all"
                     />
@@ -498,33 +744,36 @@ export default function AddProduct() {
               )}
             </section>
 
-            {/* Error */}
             {error && (
               <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-sm text-red-600">
                 {error}
               </div>
             )}
 
-            {/* ─── PUBLISH ─── */}
             <div className="pt-4 border-t border-border">
               <button
                 type="submit"
                 disabled={!canPublish || optimizing || saving}
-                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-xl bg-charcoal-700 text-white font-medium text-sm tracking-wide hover:bg-charcoal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-xl bg-charcoal-700 text-white font-medium text-sm tracking-wide hover:bg-charcoal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
               >
                 {(optimizing || saving) && <Loader2 size={18} className="animate-spin" />}
                 {optimizing
                   ? 'Optimizing photos…'
                   : saving
-                  ? 'Publishing…'
-                  : editId
-                  ? 'Update Piece'
-                  : 'Publish Piece'}
+                    ? 'Publishing…'
+                    : editId
+                      ? 'Update Piece'
+                      : 'Publish Piece'}
               </button>
 
               {!canPublish && (
                 <p className="text-center text-xs text-charcoal-400 mt-3">
                   Add a name, price, and at least one photo to publish
+                </p>
+              )}
+              {!editId && (
+                <p className="text-center text-[11px] text-charcoal-300 mt-2">
+                  Progress is saved on this device automatically
                 </p>
               )}
             </div>
