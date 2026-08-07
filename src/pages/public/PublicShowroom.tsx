@@ -209,6 +209,15 @@ export default function PublicShowroom() {
     }
   }, [activeProduct?.id]);
 
+  // Preload every photo in the active set so page-turns never flash empty
+  useEffect(() => {
+    if (activeImages.length === 0) return;
+    activeImages.forEach((url) => {
+      const img = new Image();
+      img.src = optimizeImageUrl(url);
+    });
+  }, [activeImages]);
+
   const shareId = data.designer?.id || data.designer?.user_id || designerId;
   const shareUrl = activeProduct
     ? `${window.location.origin}/showroom/${shareId}?piece=${activeProduct.id}`
@@ -235,6 +244,7 @@ export default function PublicShowroom() {
       const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const current = activeImageIndexRef.current;
       const nextIndex = (current + dir + activeImages.length) % activeImages.length;
+      const nextSrc = optimizeImageUrl(activeImages[nextIndex]);
 
       if (prefersReduced || !frontPageRef.current || !underPageRef.current) {
         activeImageIndexRef.current = nextIndex;
@@ -244,10 +254,9 @@ export default function PublicShowroom() {
 
       isTurning.current = true;
 
-      const underImg = underPageRef.current.querySelector('img');
-      if (underImg) {
-        underImg.src = optimizeImageUrl(activeImages[nextIndex]);
-      }
+      // Put the destination image under the turning leaf *before* animating
+      const underImg = underPageRef.current.querySelector('img') as HTMLImageElement | null;
+      if (underImg) underImg.src = nextSrc;
 
       const origin = dir > 0 ? 'left center' : 'right center';
       const endRotate = dir > 0 ? -105 : 105;
@@ -261,9 +270,15 @@ export default function PublicShowroom() {
 
       gsap.to(frontPageRef.current, {
         rotateY: endRotate,
-        duration: 0.65,
+        duration: 0.55,
         ease: 'power2.inOut',
         onComplete: () => {
+          // Swap front image WHILE still edge-on, then snap flat — no flash
+          const frontImg = frontPageRef.current?.querySelector(
+            'img',
+          ) as HTMLImageElement | null;
+          if (frontImg) frontImg.src = nextSrc;
+
           activeImageIndexRef.current = nextIndex;
           setActiveImageIndex(nextIndex);
           gsap.set(frontPageRef.current, { rotateY: 0 });
@@ -279,6 +294,7 @@ export default function PublicShowroom() {
       if (index === activeImageIndexRef.current || isTurning.current) return;
       if (activeImages.length <= 1) return;
 
+      const nextSrc = optimizeImageUrl(activeImages[index]);
       const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (prefersReduced || !frontPageRef.current) {
         activeImageIndexRef.current = index;
@@ -287,16 +303,19 @@ export default function PublicShowroom() {
       }
 
       isTurning.current = true;
-      const underImg = underPageRef.current?.querySelector('img');
-      if (underImg) {
-        underImg.src = optimizeImageUrl(activeImages[index]);
-      }
+      const underImg = underPageRef.current?.querySelector('img') as HTMLImageElement | null;
+      if (underImg) underImg.src = nextSrc;
 
       gsap.to(frontPageRef.current, {
         opacity: 0,
-        duration: 0.25,
+        duration: 0.2,
         ease: 'power1.in',
         onComplete: () => {
+          const frontImg = frontPageRef.current?.querySelector(
+            'img',
+          ) as HTMLImageElement | null;
+          if (frontImg) frontImg.src = nextSrc;
+
           activeImageIndexRef.current = index;
           setActiveImageIndex(index);
           gsap.set(frontPageRef.current, { opacity: 1, rotateY: 0 });
