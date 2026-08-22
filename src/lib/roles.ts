@@ -28,7 +28,10 @@ type FloorProfile = {
 
 function adminEmails(): string[] {
   const raw = process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || "";
-  return raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  return raw
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 async function supabaseProfilesByEmail(email: string): Promise<FloorProfile | null> {
@@ -66,7 +69,9 @@ export async function supabasePasswordWorks(email: string, password: string): Pr
 
 async function emailForUser(userId: string): Promise<string | null> {
   const sql = await getSql();
-  const rows = await sql.query<{ email: string | null }>(`select email from "user" where id = $1 limit 1`, [userId]);
+  const rows = await sql.query<{ email: string | null }>(`select email from "user" where id = $1 limit 1`, [
+    userId,
+  ]);
   return rows[0]?.email?.toLowerCase() ?? null;
 }
 
@@ -83,7 +88,10 @@ async function upsertRole(userId: string, email: string | null, role: HouseRole)
 async function resolveIdentity(userId: string): Promise<HouseIdentity> {
   const email = await emailForUser(userId);
   const sql = await getSql();
-  const local = await sql.query<{ role: HouseRole }>(`select role from user_roles where user_id = $1 limit 1`, [userId]);
+  const local = await sql.query<{ role: HouseRole }>(
+    `select role from user_roles where user_id = $1 limit 1`,
+    [userId],
+  );
   const admins = adminEmails();
   const floor = email ? await supabaseProfilesByEmail(email) : null;
 
