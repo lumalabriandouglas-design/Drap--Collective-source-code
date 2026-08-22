@@ -1,4 +1,4 @@
-import { readdirSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Plugin } from "vite";
 import { defineConfig } from "vite";
@@ -12,6 +12,7 @@ import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
 import { appEnvPlugin } from "./scripts/app-env-plugin.mjs";
 import { isMigrationFile } from "./scripts/migration-plan.mjs";
 
+/** The files `src/lib/db.ts` globs — same directory, same non-recursive scope. */
 function hasGlobbedMigrations(root: string): boolean {
   try {
     return readdirSync(join(root, "migrations")).some(isMigrationFile);
@@ -116,6 +117,24 @@ function authPopupPlugin(): Plugin {
   };
 }
 
+function copyNitroStaticToDist(): Plugin {
+  return {
+    name: "drape:nitro-static-to-dist",
+    apply: "build",
+    closeBundle: {
+      sequential: true,
+      order: "post",
+      handler() {
+        const src = join(process.cwd(), ".vercel/output/static");
+        const dest = join(process.cwd(), "dist");
+        if (!existsSync(src)) return;
+        mkdirSync(dest, { recursive: true });
+        cpSync(src, dest, { recursive: true });
+      },
+    },
+  };
+}
+
 export default defineConfig(({ command, isPreview }) => ({
   server: {
     host: "0.0.0.0",
@@ -134,7 +153,9 @@ export default defineConfig(({ command, isPreview }) => ({
     appEnvPlugin(),
     grokPwaPlugin(),
     tailwindcss(),
-    tanstackStart(),
+    tanstackStart({
+      spa: { enabled: true },
+    }),
     ...(command === "build" || isPreview
       ? [
           nitro({
@@ -143,6 +164,7 @@ export default defineConfig(({ command, isPreview }) => ({
           }),
         ]
       : []),
+    copyNitroStaticToDist(),
     viteReact(),
   ],
 }));
