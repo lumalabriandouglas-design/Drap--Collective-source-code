@@ -29,7 +29,7 @@ export async function getSessionUser(bearerToken?: string): Promise<VerifiedUser
   let headers = request.headers;
   if (bearerToken) {
     headers = new Headers(request.headers);
-    headers.set("Authorization", `Bearer ${token}`);
+    headers.set("Authorization", `Bearer ${bearerToken}`);
   }
   const session = await auth.api.getSession({ headers });
   if (!session?.user) return null;
