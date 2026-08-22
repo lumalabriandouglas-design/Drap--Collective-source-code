@@ -11,15 +11,16 @@ Premium marketplace for Kampala ateliers. Live catalog is the existing Supabase 
 
 ## Vercel preview
 
-The live project is still a static Vite site (`dist` + SPA rewrites). This branch matches that contract when `VERCEL=1`:
+The live project is a static Vite site (`index.html` → `src/main.tsx` → `dist`). This branch matches that contract when Vercel runs `vite build`:
 
+- Root `index.html` is the same SPA door the live house uses
 - `vite build` writes `dist/index.html` and the client bundle
 - Shop, ateliers, journal, and the hero load from the live catalog in the browser
 - Existing designer emails and passwords sign in the same way as [odrapecollective.com](https://odrapecollective.com)
 
-Leave the dashboard as the old Vite site (Framework Vite, Output Directory `dist`). Production Branch stays on `main`, so the live house does not change.
+Leave the dashboard as the old Vite site (Framework Vite, Output Directory `dist`, Node 22 if you can). Production Branch stays on `main`, so the live house does not change.
 
-This branch does **not** run database migrations on build.
+This branch does **not** run database migrations on build. Do not set `DATABASE_URL` to live Supabase.
 
 ## Env vars (preview + production)
 
