@@ -1,7 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getSql } from "@/lib/db";
-import { loadFloor } from "@/lib/live-floor";
+import { loadFloor, type Floor } from "@/lib/live-floor";
 import type { Designer, Lookbook, Product } from "@/lib/types";
+
+type ProductFilter = {
+  category?: string;
+  q?: string;
+  atelier?: string;
+  featured?: boolean;
+  limit?: number;
+};
 
 type ProductRow = {
   id: number;
@@ -87,25 +95,28 @@ async function localStudioPieces(): Promise<Product[]> {
   }
 }
 
-async function floorWithStudio() {
-  let floor;
+async function liveFloor(): Promise<Floor> {
   try {
-    floor = await loadFloor();
+    return await loadFloor();
   } catch {
-    floor = { products: [] as Product[], designers: [] as Designer[], lookbooks: [] as Lookbook[] };
+    return { products: [], designers: [], lookbooks: [] };
   }
-  const studio = await localStudioPieces();
-  const products = [...studio, ...floor.products];
-  return { ...floor, products };
 }
 
-function filterProducts(
-  products: Product[],
-  data: { category?: string; q?: string; atelier?: string; featured?: boolean; limit?: number },
-) {
+async function floorWithStudio() {
+  const floor = await liveFloor();
+  const studio = await localStudioPieces();
+  return { ...floor, products: [...studio, ...floor.products] };
+}
+
+function filterProducts(products: Product[], data: ProductFilter) {
   let next = products;
-  if (data.category && data.category !== "All") next = next.filter((p) => p.category === data.category);
-  if (data.atelier) next = next.filter((p) => p.designer.slug === data.atelier);
+  if (data.category && data.category !== "All") {
+    next = next.filter((p) => p.category === data.category);
+  }
+  if (data.atelier) {
+    next = next.filter((p) => p.designer.slug === data.atelier);
+  }
   if (data.q?.trim()) {
     const q = data.q.trim().toLowerCase();
     next = next.filter(
@@ -115,36 +126,14 @@ function filterProducts(
         p.designer.name.toLowerCase().includes(q),
     );
   }
-  if (data.featured) next = next.filter((p) => p.featured);
+  if (data.featured) {
+    next = next.filter((p) => p.featured);
+  }
   const limit = data.limit == null ? next.length : Math.min(Math.max(data.limit, 1), 400);
   return next.slice(0, limit);
 }
 
-export const listProducts = createServerFn({ method: "GET" })
-  .validator((input: { category?: string; q?: string; atelier?: string; featured?: boolean; limit?: number }) => input)
-  .handler(async ({ data }) => {
-    const floor = await floorWithStudio();
-    return filterProducts(floor.products, data);
-  });
-
-export const getProduct = createServerFn({ method: "GET" })
-  .validator((slug: string) => slug)
-  .handler(async ({ data: slug }) => {
-    const floor = await floorWithStudio();
-    return floor.products.find((p) => p.slug === slug) ?? null;
-  });
-
-export const listRelated = createServerFn({ method: "GET" })
-  .validator((input: { slug: string; category: string; designerSlug: string }) => input)
-  .handler(async ({ data }) => {
-    const floor = await floorWithStudio();
-    return floor.products
-      .filter((p) => p.slug !== data.slug && (p.category === data.category || p.designer.slug === data.designerSlug))
-      .slice(0, 4);
-  });
-
-export const listDesigners = createServerFn({ method: "GET" }).handler(async () => {
-  const floor = await floorWithStudio();
+function designersOf(floor: Floor): Designer[] {
   const extra = new Map<string, Designer>();
   for (const product of floor.products) {
     if (!floor.designers.some((d) => d.slug === product.designer.slug)) {
@@ -163,68 +152,175 @@ export const listDesigners = createServerFn({ method: "GET" }).handler(async () 
       });
     }
   }
-  const designers = [...floor.designers, ...extra.values()].map((d) => ({
-    ...d,
-    pieceCount: floor.products.filter((p) => p.designer.slug === d.slug).length,
-  }));
-  return designers.sort((a, b) => Number(b.featured) - Number(a.featured) || b.pieceCount - a.pieceCount);
-});
+  return [...floor.designers, ...extra.values()]
+    .map((d) => ({
+      ...d,
+      pieceCount: floor.products.filter((p) => p.designer.slug === d.slug).length,
+    }))
+    .sort((a, b) => Number(b.featured) - Number(a.featured) || b.pieceCount - a.pieceCount);
+}
 
-export const getDesigner = createServerFn({ method: "GET" })
+function relatedOf(
+  floor: Floor,
+  data: { slug: string; category: string; designerSlug: string },
+): Product[] {
+  return floor.products
+    .filter(
+      (p) =>
+        p.slug !== data.slug && (p.category === data.category || p.designer.slug === data.designerSlug),
+    )
+    .slice(0, 4);
+}
+
+function designerOf(floor: Floor, slug: string) {
+  const pieces = floor.products.filter((p) => p.designer.slug === slug);
+  const listed = floor.designers.find((d) => d.slug === slug);
+  if (!listed && pieces.length === 0) return null;
+  const designer: Designer = listed
+    ? { ...listed, pieceCount: pieces.length }
+    : {
+        id: pieces[0].designer.id,
+        slug,
+        name: pieces[0].designer.name,
+        city: pieces[0].designer.city,
+        country: pieces[0].designer.country,
+        bio: "",
+        philosophy: null,
+        imageUrl: pieces[0].designer.imageUrl,
+        featured: false,
+        userId: null,
+        pieceCount: pieces.length,
+      };
+  return { designer, pieces };
+}
+
+function lookbookOf(floor: Floor, slug: string) {
+  const lookbook = floor.lookbooks.find((l) => l.slug === slug);
+  if (!lookbook) return null;
+  const pieces = floor.products.filter((p) => lookbook.productSlugs.includes(p.slug));
+  return { lookbook, pieces };
+}
+
+function recommendOf(floor: Floor, tags: string[]): Product[] {
+  const wanted = new Set(tags.map((t) => t.toLowerCase()));
+  const scored = floor.products
+    .map((product) => ({
+      product,
+      score: product.tags.filter((tag) => wanted.has(tag.toLowerCase())).length,
+    }))
+    .sort((a, b) => b.score - a.score);
+  const picked = scored.filter((s) => s.score > 0).slice(0, 8);
+  return (picked.length ? picked : scored.slice(0, 8)).map((s) => s.product);
+}
+
+const listProductsRpc = createServerFn({ method: "GET" })
+  .validator((input: ProductFilter) => input)
+  .handler(async ({ data }) => {
+    const floor = await floorWithStudio();
+    return filterProducts(floor.products, data);
+  });
+
+const getProductRpc = createServerFn({ method: "GET" })
   .validator((slug: string) => slug)
   .handler(async ({ data: slug }) => {
     const floor = await floorWithStudio();
-    const pieces = floor.products.filter((p) => p.designer.slug === slug);
-    const listed = floor.designers.find((d) => d.slug === slug);
-    if (!listed && pieces.length === 0) return null;
-    const designer: Designer = listed
-      ? { ...listed, pieceCount: pieces.length }
-      : {
-          id: pieces[0].designer.id,
-          slug,
-          name: pieces[0].designer.name,
-          city: pieces[0].designer.city,
-          country: pieces[0].designer.country,
-          bio: "",
-          philosophy: null,
-          imageUrl: pieces[0].designer.imageUrl,
-          featured: false,
-          userId: null,
-          pieceCount: pieces.length,
-        };
-    return { designer, pieces };
+    return floor.products.find((p) => p.slug === slug) ?? null;
   });
 
-export const listLookbooks = createServerFn({ method: "GET" }).handler(async () => {
+const listRelatedRpc = createServerFn({ method: "GET" })
+  .validator((input: { slug: string; category: string; designerSlug: string }) => input)
+  .handler(async ({ data }) => {
+    const floor = await floorWithStudio();
+    return relatedOf(floor, data);
+  });
+
+const listDesignersRpc = createServerFn({ method: "GET" }).handler(async () => {
+  return designersOf(await floorWithStudio());
+});
+
+const getDesignerRpc = createServerFn({ method: "GET" })
+  .validator((slug: string) => slug)
+  .handler(async ({ data: slug }) => designerOf(await floorWithStudio(), slug));
+
+const listLookbooksRpc = createServerFn({ method: "GET" }).handler(async () => {
   try {
-    const floor = await loadFloor();
-    return floor.lookbooks;
+    return (await loadFloor()).lookbooks;
   } catch {
     return [] as Lookbook[];
   }
 });
 
-export const getLookbook = createServerFn({ method: "GET" })
+const getLookbookRpc = createServerFn({ method: "GET" })
   .validator((slug: string) => slug)
-  .handler(async ({ data: slug }) => {
-    const floor = await floorWithStudio();
-    const lookbook = floor.lookbooks.find((l) => l.slug === slug);
-    if (!lookbook) return null;
-    const pieces = floor.products.filter((p) => lookbook.productSlugs.includes(p.slug));
-    return { lookbook, pieces };
-  });
+  .handler(async ({ data: slug }) => lookbookOf(await floorWithStudio(), slug));
 
-export const recommendProducts = createServerFn({ method: "GET" })
+const recommendProductsRpc = createServerFn({ method: "GET" })
   .validator((tags: string[]) => tags)
-  .handler(async ({ data: tags }) => {
-    const floor = await floorWithStudio();
-    const wanted = new Set(tags.map((t) => t.toLowerCase()));
-    const scored = floor.products
-      .map((product) => ({
-        product,
-        score: product.tags.filter((tag) => wanted.has(tag.toLowerCase())).length,
-      }))
-      .sort((a, b) => b.score - a.score);
-    const picked = scored.filter((s) => s.score > 0).slice(0, 8);
-    return (picked.length ? picked : scored.slice(0, 8)).map((s) => s.product);
-  });
+  .handler(async ({ data: tags }) => recommendOf(await floorWithStudio(), tags));
+
+export async function listProducts(opts: { data?: ProductFilter } = {}) {
+  const data = opts.data ?? {};
+  try {
+    return await listProductsRpc({ data });
+  } catch {
+    return filterProducts((await liveFloor()).products, data);
+  }
+}
+
+export async function getProduct(opts: { data: string }) {
+  try {
+    return await getProductRpc({ data: opts.data });
+  } catch {
+    return (await liveFloor()).products.find((p) => p.slug === opts.data) ?? null;
+  }
+}
+
+export async function listRelated(opts: {
+  data: { slug: string; category: string; designerSlug: string };
+}) {
+  try {
+    return await listRelatedRpc({ data: opts.data });
+  } catch {
+    return relatedOf(await liveFloor(), opts.data);
+  }
+}
+
+export async function listDesigners() {
+  try {
+    return await listDesignersRpc();
+  } catch {
+    return designersOf(await liveFloor());
+  }
+}
+
+export async function getDesigner(opts: { data: string }) {
+  try {
+    return await getDesignerRpc({ data: opts.data });
+  } catch {
+    return designerOf(await liveFloor(), opts.data);
+  }
+}
+
+export async function listLookbooks() {
+  try {
+    return await listLookbooksRpc();
+  } catch {
+    return (await liveFloor()).lookbooks;
+  }
+}
+
+export async function getLookbook(opts: { data: string }) {
+  try {
+    return await getLookbookRpc({ data: opts.data });
+  } catch {
+    return lookbookOf(await liveFloor(), opts.data);
+  }
+}
+
+export async function recommendProducts(opts: { data: string[] }) {
+  try {
+    return await recommendProductsRpc({ data: opts.data });
+  } catch {
+    return recommendOf(await liveFloor(), opts.data);
+  }
+}
