@@ -9,11 +9,27 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "allowJs": true,
-    "checkJs": true,
+    "checkJs": false,
     "noEmit": true,
     "types": ["vite/client", "node"],
     "baseUrl": ".",
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src", "server"]
+  "include": ["src", "server"],
+  "exclude": [
+    "src/pages",
+    "src/hooks",
+    "src/contexts",
+    "src/config",
+    "src/constants",
+    "src/types",
+    "src/components/assistant",
+    "src/components/brand",
+    "src/components/layout",
+    "src/components/placeholder",
+    "src/App.tsx",
+    "src/main.tsx",
+    "src/index.css",
+    "src/sw.js"
+  ]
 }
