@@ -15,6 +15,7 @@ export const authClient = createAuthClient({
 });
 
 export const authEnabled = import.meta.env.VITE_AUTH_ENABLED !== "false";
+
 export { GROK_PROVIDERS };
 
 const BEARER_KEY = "grok-auth.bearer-token";
@@ -34,12 +35,15 @@ function setBearerToken(token: string | null): void {
     if (token) window.sessionStorage.setItem(BEARER_KEY, token);
     else window.sessionStorage.removeItem(BEARER_KEY);
   } catch {
-    /* storage unavailable */
+    /* storage unavailable — ignore */
   }
 }
 
 function inLivePreview(): boolean {
-  return typeof window !== "undefined" && window.location.hostname.endsWith(".grok-sandbox.com");
+  return (
+    typeof window !== "undefined" &&
+    window.location.hostname.endsWith(".grok-sandbox.com")
+  );
 }
 
 type PopupMessage = { source: "grok-auth-popup"; token: string | null; error?: string };
@@ -51,7 +55,6 @@ export async function signIn(
   const callbackURL = opts.callbackURL ?? "/";
   const errorCallbackURL = opts.errorCallbackURL ?? "/";
   const popup = inLivePreview() ? openSignInPopup(providerId) : null;
-
   await runPreSignInSignOut({
     livePreview: inLivePreview(),
     hasBearer: Boolean(getBearerToken()),
@@ -67,7 +70,7 @@ export async function signIn(
     try {
       await authClient.getSession();
     } catch {
-      /* session store will recover */
+      /* session store will recover on next useSession fetch */
     }
     if (typeof window !== "undefined") {
       const dest = new URL(callbackURL, window.location.origin);
@@ -127,6 +130,12 @@ function waitForPopupToken(popup: Window): Promise<string | null> {
 }
 
 export async function signOut(redirectTo = "/"): Promise<void> {
+  const { clearFloorSession } = await import("@/lib/floor-auth");
+  clearFloorSession();
+  if (import.meta.env.VITE_SPA === "true") {
+    if (typeof window !== "undefined") window.location.href = redirectTo;
+    return;
+  }
   await runSignOut({
     livePreview: inLivePreview(),
     hasBearer: Boolean(getBearerToken()),
