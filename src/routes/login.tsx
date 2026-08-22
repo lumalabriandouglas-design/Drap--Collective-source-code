@@ -6,13 +6,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Wordmark } from "@/components/wordmark";
-import { GROK_PROVIDERS, authClient, authEnabled, signIn } from "@/lib/auth/client";
+import {
+  GROK_PROVIDERS,
+  authClient,
+  authEnabled,
+  signIn,
+} from "@/lib/auth/client";
 import { houseError } from "@/lib/errors";
+import { floorSignIn } from "@/lib/floor-auth";
 import { checkExistingPassword, claimRole, getMyRole } from "@/lib/roles";
 import { pathForRole } from "@/lib/use-role";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/login")({ component: Login });
+
+const spa = import.meta.env.VITE_SPA === "true";
 
 function Login() {
   const navigate = useNavigate();
@@ -38,6 +46,9 @@ function Login() {
     setHint(null);
     try {
       if (mode === "up") {
+        if (spa) {
+          throw new Error("New accounts open from the live house. Existing designers, sign in with the same email.");
+        }
         const { error } = await authClient.signUp.email({
           email,
           password,
@@ -47,19 +58,30 @@ function Login() {
         await claimRole({ data: { role: door } });
         toast.success(door === "designer" ? "Your atelier door is open" : "Welcome to the house");
       } else {
-        const first = await authClient.signIn.email({ email, password });
-        if (first.error) {
-          const existing = await checkExistingPassword({ data: { email, password } });
-          if (!existing.ok) throw new Error(first.error.message || "Could not sign in");
-          const created = await authClient.signUp.email({
-            email,
-            password,
-            name: email.split("@")[0],
-          });
-          if (created.error) {
-            const again = await authClient.signIn.email({ email, password });
-            if (again.error) throw new Error(again.error.message || "Could not sign in");
+        let signedIn = false;
+        if (!spa) {
+          let { error } = await authClient.signIn.email({ email, password });
+          if (error) {
+            const existing = await checkExistingPassword({ data: { email, password } });
+            if (existing.ok) {
+              const created = await authClient.signUp.email({
+                email,
+                password,
+                name: email.split("@")[0],
+              });
+              if (created.error) {
+                const again = await authClient.signIn.email({ email, password });
+                if (!again.error) signedIn = true;
+              } else {
+                signedIn = true;
+              }
+            }
+          } else {
+            signedIn = true;
           }
+        }
+        if (!signedIn) {
+          await floorSignIn(email, password);
         }
         toast.success("Signed in");
       }
@@ -74,7 +96,14 @@ function Login() {
   return (
     <main className="grid min-h-dvh lg:grid-cols-2">
       <div className="relative hidden overflow-hidden bg-charcoal-900 lg:block">
-        <img src="/images/hero-2.jpg" alt="" className="absolute inset-0 size-full object-cover opacity-80" />
+        <img
+          src="/images/hero-2.jpg"
+          alt=""
+          className="absolute inset-0 size-full object-cover opacity-80"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
         <div className="absolute inset-0 bg-charcoal-900/40" />
         <div className="relative flex h-full flex-col justify-end p-12">
           <Wordmark light className="text-3xl" />
@@ -85,19 +114,34 @@ function Login() {
       </div>
       <div className="flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-sm">
-          <h1 className="font-serif text-3xl text-charcoal-800">{mode === "in" ? "Sign in" : "Join the house"}</h1>
+          <h1 className="font-serif text-3xl text-charcoal-800">
+            {mode === "in" ? "Sign in" : "Join the house"}
+          </h1>
           <p className="mt-2 text-sm text-charcoal-500">
-            {mode === "in" ? "Already on the floor? Use the same email." : "A collector’s account, or an atelier. One minute."}
+            {mode === "in"
+              ? "Already on the floor? Use the same email."
+              : "A collector’s account, or an atelier. One minute."}
           </p>
           <div className="gold-line my-6" />
           {authEnabled ? (
             <div className="space-y-3">
-              {GROK_PROVIDERS.map((p) => (
-                <Button key={p.providerId} type="button" variant="outline" className="w-full" onClick={() => signIn(p.providerId, { callbackURL: "/welcome" })}>
-                  Continue with {p.label}
-                </Button>
-              ))}
-              <p className="py-2 text-center text-[10px] uppercase tracking-[0.18em] text-charcoal-300">or with email</p>
+              {!spa &&
+                GROK_PROVIDERS.map((p) => (
+                  <Button
+                    key={p.providerId}
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => signIn(p.providerId, { callbackURL: "/welcome" })}
+                  >
+                    Continue with {p.label}
+                  </Button>
+                ))}
+              {!spa && (
+                <p className="py-2 text-center text-[10px] uppercase tracking-[0.18em] text-charcoal-300">
+                  or with email
+                </p>
+              )}
               <form onSubmit={(e) => void onEmail(e)} className="grid gap-3">
                 {mode === "up" && (
                   <>
