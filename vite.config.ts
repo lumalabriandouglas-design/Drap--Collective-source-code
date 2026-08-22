@@ -1,12 +1,10 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, renameSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { Plugin } from "vite";
 import { defineConfig } from "vite";
-import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { nitro } from "nitro/vite";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
 // @ts-expect-error JS plugin alongside the TS vite config
@@ -146,7 +144,9 @@ function renameSpaHtmlPlugin(): Plugin {
       handler() {
         const spa = join(process.cwd(), "dist/spa.html");
         const index = join(process.cwd(), "dist/index.html");
-        if (existsSync(spa)) renameSync(spa, index);
+        if (!existsSync(spa)) return;
+        if (existsSync(index)) unlinkSync(index);
+        renameSync(spa, index);
       },
     },
   };
@@ -154,9 +154,17 @@ function renameSpaHtmlPlugin(): Plugin {
 
 const vercelSpa = process.env.VERCEL === "1";
 
-export default defineConfig(({ command, isPreview }) => {
+function spaHtmlInput() {
+  const root = process.cwd();
+  const indexHtml = join(root, "index.html");
+  if (existsSync(indexHtml)) return indexHtml;
+  return join(root, "spa.html");
+}
+
+export default defineConfig(async ({ command, isPreview }) => {
   if (vercelSpa) {
     process.env.VITE_SPA = "true";
+    const src = join(process.cwd(), "src");
     return {
       appType: "spa",
       server: {
@@ -169,16 +177,18 @@ export default defineConfig(({ command, isPreview }) => {
         port: 8081,
         strictPort: true,
       },
-      resolve: { tsconfigPaths: true },
+      resolve: {
+        tsconfigPaths: true,
+        alias: { "@": src },
+      },
       build: {
         outDir: "dist",
         emptyOutDir: true,
         rollupOptions: {
-          input: join(process.cwd(), "spa.html"),
+          input: spaHtmlInput(),
         },
       },
       plugins: [
-        grokPwaPlugin(),
         tailwindcss(),
         tanstackRouter({
           target: "react",
@@ -189,6 +199,9 @@ export default defineConfig(({ command, isPreview }) => {
       ],
     };
   }
+
+  const { tanstackStart } = await import("@tanstack/react-start/plugin/vite");
+  const { nitro } = await import("nitro/vite");
 
   return {
     server: {
