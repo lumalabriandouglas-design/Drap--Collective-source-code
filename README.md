@@ -9,9 +9,14 @@ Premium marketplace for Kampala ateliers. Live catalog is the existing Supabase 
 | `main` | Current live site. Do not merge until the preview looks right. |
 | `premium-marketplace` | New marketplace (hero slider, showrooms, R2, roles). Vercel preview only. |
 
-## Vercel preview (one-time project setting)
+## Vercel preview
 
-The live project is still set up as the old static Vite site. The new app is a server app, so the preview build needs these **Build & Development** settings. Turn **off** any Override switches, or set:
+The live project is still set up as the old static Vite site. This branch does two things so the preview can come up without touching production:
+
+1. Writes Nitro’s server output (`.vercel/output`) so the house can run as a server app when Vercel is set to **Other**.
+2. Also copies the client into `dist/` with an `index.html`, so the old Vite “Output Directory = dist” setting still finds files. The floor (shop, ateliers, journal) loads from the live catalog in the browser.
+
+Best settings (Vercel → Project → Settings → General → Build & Development). Turn **off** Override, or set:
 
 | Setting | Value |
 |---|---|
