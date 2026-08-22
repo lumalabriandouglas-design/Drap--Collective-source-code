@@ -1,4 +1,6 @@
 {
+  "framework": null,
   "buildCommand": "npm run build",
-  "installCommand": "npm install --include=dev"
+  "installCommand": "npm install --include=dev",
+  "outputDirectory": null
 }
