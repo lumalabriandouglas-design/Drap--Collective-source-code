@@ -11,32 +11,23 @@ Premium marketplace for Kampala ateliers. Live catalog is the existing Supabase 
 
 ## Vercel preview
 
-The live project is still set up as the old static Vite site. This branch does two things so the preview can come up without touching production:
+The live project is still a static Vite site (`dist` + SPA rewrites). This branch matches that contract when `VERCEL=1`:
 
-1. Writes Nitro’s server output (`.vercel/output`) so the house can run as a server app when Vercel is set to **Other**.
-2. Also copies the client into `dist/` with an `index.html`, so the old Vite “Output Directory = dist” setting still finds files. The floor (shop, ateliers, journal) loads from the live catalog in the browser.
+- `vite build` writes `dist/index.html` and the client bundle
+- Shop, ateliers, journal, and the hero load from the live catalog in the browser
+- Existing designer emails and passwords sign in the same way as [odrapecollective.com](https://odrapecollective.com)
 
-Best settings (Vercel → Project → Settings → General → Build & Development). Turn **off** Override, or set:
+Leave the dashboard as the old Vite site (Framework Vite, Output Directory `dist`). Production Branch stays on `main`, so the live house does not change.
 
-| Setting | Value |
-|---|---|
-| Framework Preset | Other |
-| Build Command | `npm run build` |
-| Output Directory | *leave empty* |
-| Install Command | `npm install --include=dev` |
-| Node.js Version | 22.x |
-
-Leave Production Branch on `main`. [odrapecollective.com](https://odrapecollective.com) will not change.
-
-Existing designer and collector accounts stay. This branch does **not** run database migrations on build, so the live product catalog cannot be wiped.
+This branch does **not** run database migrations on build.
 
 ## Env vars (preview + production)
 
 | Variable | Purpose |
 |---|---|
 | `VITE_AUTH_ENABLED` | `true` |
-| `BETTER_AUTH_URL` | Preview URL, then `https://odrapecollective.com` on production |
-| `ADMIN_EMAIL` | Your email — opens the hidden house ledger |
+| `BETTER_AUTH_URL` | Only needed for the full server house. Leave unset on this static preview. |
+| `ADMIN_EMAIL` | Your email — opens the hidden house ledger on the full server house |
 | `R2_ACCOUNT_ID` | Cloudflare account |
 | `R2_BUCKET` | `odrapecollective` |
 | `R2_ACCESS_KEY_ID` | R2 token |
@@ -48,4 +39,4 @@ Existing designer and collector accounts stay. This branch does **not** run data
 
 - **Collector** — shop, bag, account
 - **Designer** — studio + shareable showroom (`/s/your-atelier`). Existing emails/passwords from the live floor still work.
-- **Admin** — only after sign-in with `ADMIN_EMAIL`. `/admin` looks like a missing page to everyone else.
+- **Admin** — only after sign-in with an admin profile on the floor. `/admin` looks like a missing page to everyone else.
