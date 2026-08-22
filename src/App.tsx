@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { lazy, Suspense } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { AuthProvider } from './contexts/AuthContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
 import { AutoRefresherProvider } from './contexts/RefreshContext';
@@ -116,6 +117,7 @@ export default function App() {
         </AuthProvider>
         </ErrorBoundary>
       </BrowserRouter>
+      <Analytics />
     </HelmetProvider>
   );
 }
