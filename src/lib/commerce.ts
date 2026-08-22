@@ -1,7 +1,6 @@
-import { createServerFn } from "@tanstack/react-start";
-import { authMiddleware } from "@/lib/auth/middleware";
-import { loadFloor } from "@/lib/live-floor";
-import { getSql } from "@/lib/db";
+import { liveFloor } from "@/lib/catalog-core";
+import { getFloorSession } from "@/lib/floor-auth";
+import { CONTACT_EMAIL } from "@/lib/constants";
 import type { OrderSummary } from "@/lib/types";
 
 export type CheckoutInput = {
@@ -22,220 +21,145 @@ export type CheckoutInput = {
   }[];
 };
 
-export const listWishlist = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const sql = await getSql();
-    return sql.query<{ product_id: number }>(
-      `select product_id from wishlist where user_id = $1 order by created_at desc`,
-      [context.userId],
-    );
-  });
+const WISH_KEY = "drape.wishlist";
+const ORDER_KEY = "drape.orders";
 
-export const toggleWishlist = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .validator((productId: number) => productId)
-  .handler(async ({ context, data: productId }) => {
-    const sql = await getSql();
-    const existing = await sql.query<{ product_id: number }>(
-      `select product_id from wishlist where user_id = $1 and product_id = $2`,
-      [context.userId, productId],
-    );
-    if (existing.length) {
-      await sql.query(`delete from wishlist where user_id = $1 and product_id = $2`, [
-        context.userId,
-        productId,
-      ]);
-      return { saved: false };
-    }
-    await sql.query(`insert into wishlist (user_id, product_id) values ($1, $2)`, [
-      context.userId,
-      productId,
-    ]);
-    return { saved: true };
-  });
+function readJson<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
-export const listSavedProducts = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const sql = await getSql();
-    const saved = await sql.query<{ product_id: number }>(
-      `select product_id from wishlist where user_id = $1 order by created_at desc`,
-      [context.userId],
-    );
-    const ids = new Set(saved.map((row) => Number(row.product_id)));
-    if (!ids.size) return [];
+function writeJson(key: string, value: unknown) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* ignore */
+  }
+}
 
-    let live: Awaited<ReturnType<typeof loadFloor>>["products"] = [];
+export async function listWishlist() {
+  if (import.meta.env.DEV || import.meta.env.SSR) {
     try {
-      live = (await loadFloor()).products;
+      const { listWishlistRpc } = await import("@/lib/commerce-rpc");
+      return await listWishlistRpc();
     } catch {
-      live = [];
+      /* local */
     }
-    const fromLive = live.filter((p) => ids.has(p.id));
+  }
+  const ids = readJson<number[]>(WISH_KEY, []);
+  return ids.map((product_id) => ({ product_id }));
+}
 
-    const local = await sql.query<{
-      id: number;
-      slug: string;
-      name: string;
-      price_cents: number;
-      image: string | null;
-      designer_name: string;
-      designer_slug: string;
-    }>(
-      `select p.id, p.slug, p.name, p.price_cents,
-              p.image_urls->>0 as image,
-              d.name as designer_name, d.slug as designer_slug
-       from products p
-       join designers d on d.id = p.designer_id
-       where p.id = any(string_to_array($1, ',')::int[])`,
-      [[...ids].join(",") || "0"],
-    );
-
-    const seen = new Set(fromLive.map((p) => p.id));
-    return [
-      ...fromLive.map((p) => ({
-        id: p.id,
-        slug: p.slug,
-        name: p.name,
-        price_cents: p.priceCents,
-        image: p.imageUrls[0] ?? null,
-        designer_name: p.designer.name,
-        designer_slug: p.designer.slug,
-      })),
-      ...local.filter((row) => !seen.has(Number(row.id))),
-    ];
-  });
-
-export const placeOrder = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .validator((input: CheckoutInput) => input)
-  .handler(async ({ context, data }) => {
-    const name = data.shippingName.trim();
-    const line1 = data.shippingLine1.trim();
-    const city = data.shippingCity.trim();
-    const country = data.shippingCountry.trim();
-    if (!name || !line1 || !city || !country) {
-      throw new Error("Please complete your delivery details.");
-    }
-    if (!data.items.length) throw new Error("Your bag is empty.");
-
-    let catalog: Awaited<ReturnType<typeof loadFloor>>["products"] = [];
+export async function toggleWishlist(opts: { data: number }) {
+  if (import.meta.env.DEV || import.meta.env.SSR) {
     try {
-      catalog = (await loadFloor()).products;
+      const { toggleWishlistRpc } = await import("@/lib/commerce-rpc");
+      return await toggleWishlistRpc({ data: opts.data });
     } catch {
-      catalog = [];
+      /* local */
     }
-    const byId = new Map(catalog.map((p) => [p.id, p]));
+  }
+  const ids = readJson<number[]>(WISH_KEY, []);
+  const next = ids.includes(opts.data) ? ids.filter((id) => id !== opts.data) : [...ids, opts.data];
+  writeJson(WISH_KEY, next);
+  return { saved: next.includes(opts.data) };
+}
 
-    let total = 0;
-    const lines: {
-      productId: number | null;
-      name: string;
-      designerName: string;
-      size: string;
-      qty: number;
-      priceCents: number;
-      imageUrl: string | null;
-    }[] = [];
-
-    for (const item of data.items) {
-      const live = byId.get(item.productId);
-      const qty = Math.min(Math.max(item.qty, 1), 8);
-      const price = live?.priceCents ?? item.priceCents;
-      const label = live?.name ?? item.name;
-      if (!label || !Number.isFinite(price)) continue;
-      total += price * qty;
-      lines.push({
-        productId: null,
-        name: label,
-        designerName: live?.designer.name ?? item.designerName,
-        size: item.size,
-        qty,
-        priceCents: price,
-        imageUrl: live?.imageUrls[0] ?? item.image ?? null,
-      });
+export async function listSavedProducts() {
+  if (import.meta.env.DEV || import.meta.env.SSR) {
+    try {
+      const { listSavedProductsRpc } = await import("@/lib/commerce-rpc");
+      return await listSavedProductsRpc();
+    } catch {
+      /* local */
     }
-    if (!lines.length) throw new Error("Those pieces are no longer available.");
+  }
+  const ids = new Set(readJson<number[]>(WISH_KEY, []));
+  if (!ids.size) return [];
+  const products = (await liveFloor()).products.filter((p) => ids.has(p.id));
+  return products.map((p) => ({
+    id: p.id,
+    slug: p.slug,
+    name: p.name,
+    price_cents: p.priceCents,
+    image: p.imageUrls[0] ?? null,
+    designer_name: p.designer.name,
+    designer_slug: p.designer.slug,
+  }));
+}
 
-    const sql = await getSql();
-    const orderRows = await sql.query<{ id: number }>(
-      `insert into orders (user_id, status, total_cents, currency, shipping_name, shipping_line1, shipping_city, shipping_country)
-       values ($1, 'confirmed', $2, $3, $4, $5, $6, $7)
-       returning id`,
-      [context.userId, total, data.currency || "UGX", name, line1, city, country],
-    );
-    const orderId = Number(orderRows[0].id);
-    for (const line of lines) {
-      await sql.query(
-        `insert into order_items (order_id, product_id, name, designer_name, size, qty, price_cents, image_url)
-         values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [orderId, line.productId, line.name, line.designerName, line.size, line.qty, line.priceCents, line.imageUrl],
-      );
+export async function placeOrder(opts: { data: CheckoutInput }) {
+  if (import.meta.env.DEV || import.meta.env.SSR) {
+    try {
+      const { placeOrderRpc } = await import("@/lib/commerce-rpc");
+      return await placeOrderRpc({ data: opts.data });
+    } catch {
+      /* local */
     }
-    return { orderId, totalCents: total };
-  });
+  }
+  if (!getFloorSession()) throw new Error("Sign in to place an order.");
+  const data = opts.data;
+  const name = data.shippingName.trim();
+  const line1 = data.shippingLine1.trim();
+  const city = data.shippingCity.trim();
+  const country = data.shippingCountry.trim();
+  if (!name || !line1 || !city || !country) {
+    throw new Error("Please complete your delivery details.");
+  }
+  if (!data.items.length) throw new Error("Your bag is empty.");
+  const total = data.items.reduce((sum, item) => sum + item.priceCents * item.qty, 0);
+  const order: OrderSummary = {
+    id: Date.now(),
+    status: "confirmed",
+    totalCents: total,
+    currency: data.currency || "UGX",
+    shippingName: name,
+    shippingCity: city,
+    shippingCountry: country,
+    createdAt: new Date().toISOString(),
+    items: data.items.map((item) => ({
+      name: item.name,
+      designerName: item.designerName,
+      size: item.size,
+      qty: item.qty,
+      priceCents: item.priceCents,
+      imageUrl: item.image ?? null,
+    })),
+  };
+  writeJson(ORDER_KEY, [order, ...readJson<OrderSummary[]>(ORDER_KEY, [])].slice(0, 20));
+  return { orderId: order.id, totalCents: total };
+}
 
-export const listOrders = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const sql = await getSql();
-    const orders = await sql.query<{
-      id: number;
-      status: string;
-      total_cents: number;
-      currency: string;
-      shipping_name: string;
-      shipping_city: string;
-      shipping_country: string;
-      created_at: string;
-    }>(
-      `select id, status, total_cents, currency, shipping_name, shipping_city, shipping_country, created_at
-       from orders where user_id = $1 order by created_at desc`,
-      [context.userId],
-    );
-    const result: OrderSummary[] = [];
-    for (const order of orders) {
-      const items = await sql.query<{
-        name: string;
-        designer_name: string;
-        size: string;
-        qty: number;
-        price_cents: number;
-        image_url: string | null;
-      }>(`select name, designer_name, size, qty, price_cents, image_url from order_items where order_id = $1`, [order.id]);
-      result.push({
-        id: Number(order.id),
-        status: order.status,
-        totalCents: Number(order.total_cents),
-        currency: order.currency,
-        shippingName: order.shipping_name,
-        shippingCity: order.shipping_city,
-        shippingCountry: order.shipping_country,
-        createdAt: order.created_at,
-        items: items.map((item) => ({
-          name: item.name,
-          designerName: item.designer_name,
-          size: item.size,
-          qty: Number(item.qty),
-          priceCents: Number(item.price_cents),
-          imageUrl: item.image_url,
-        })),
-      });
+export async function listOrders() {
+  if (import.meta.env.DEV || import.meta.env.SSR) {
+    try {
+      const { listOrdersRpc } = await import("@/lib/commerce-rpc");
+      return await listOrdersRpc();
+    } catch {
+      /* local */
     }
-    return result;
-  });
+  }
+  return readJson<OrderSummary[]>(ORDER_KEY, []);
+}
 
-export const sendInquiry = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .validator((input: { productId?: number; designerId?: number; message: string }) => input)
-  .handler(async ({ context, data }) => {
-    const message = data.message.trim();
-    if (message.length < 8) throw new Error("Write a little more so the atelier can reply.");
-    const sql = await getSql();
-    await sql.query(
-      `insert into inquiries (user_id, product_id, designer_id, message) values ($1, $2, $3, $4)`,
-      [context.userId, data.productId ?? null, data.designerId ?? null, message],
-    );
-    return { ok: true };
-  });
+export async function sendInquiry(opts: {
+  data: { productId?: number; designerId?: number; message: string };
+}) {
+  if (import.meta.env.DEV || import.meta.env.SSR) {
+    try {
+      const { sendInquiryRpc } = await import("@/lib/commerce-rpc");
+      return await sendInquiryRpc({ data: opts.data });
+    } catch {
+      /* preview */
+    }
+  }
+  const message = opts.data.message.trim();
+  if (message.length < 8) throw new Error("Write a little more so the atelier can reply.");
+  throw new Error(`Inquiries from this preview reach the house at ${CONTACT_EMAIL}.`);
+}
