@@ -64,6 +64,9 @@ function Account() {
               <Link to="/atelier-house">House ledger</Link>
             </Button>
           )}
+          <Button asChild variant="outline">
+            <Link to="/desk">The desk</Link>
+          </Button>
         </>
       }
     >

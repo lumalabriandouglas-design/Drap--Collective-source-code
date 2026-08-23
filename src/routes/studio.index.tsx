@@ -154,6 +154,9 @@ function Studio() {
             </Button>
           )}
           <Button asChild variant="outline">
+            <Link to="/desk">Collector notes</Link>
+          </Button>
+          <Button asChild variant="outline">
             <Link to="/s/$slug" params={{ slug: atelier.slug }}>
               Open showroom
               <ArrowUpRight size={14} />

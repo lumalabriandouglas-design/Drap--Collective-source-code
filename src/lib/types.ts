@@ -9,6 +9,7 @@ export type Designer = {
   imageUrl: string;
   featured: boolean;
   userId: string | null;
+  authId?: string | null;
   pieceCount: number;
 };
 
@@ -26,7 +27,7 @@ export type Product = {
   leadTime: string | null;
   featured: boolean;
   listedBy: string | null;
-  designer: Pick<Designer, "id" | "slug" | "name" | "city" | "country" | "imageUrl">;
+  designer: Pick<Designer, "id" | "slug" | "name" | "city" | "country" | "imageUrl" | "userId">;
 };
 
 export type Lookbook = {

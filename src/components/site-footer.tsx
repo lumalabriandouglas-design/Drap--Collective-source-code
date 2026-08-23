@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import { Wordmark } from "@/components/wordmark";
-import { CONTACT_EMAIL } from "@/lib/constants";
 import { CURRENCIES } from "@/lib/format";
 import { useCurrency } from "@/lib/currency-store";
 
@@ -21,23 +20,42 @@ export function SiteFooter() {
             <div className="gold-line mt-6" />
           </div>
           <div>
-            <h4 className="mb-5 text-[10px] font-medium uppercase tracking-[0.18em] text-gold-600">Explore</h4>
+            <h4 className="mb-5 text-[10px] font-medium uppercase tracking-[0.18em] text-gold-600">
+              Explore
+            </h4>
             <div className="flex flex-col">
-              <Link to="/shop" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">Shop the collection</Link>
-              <Link to="/ateliers" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">Ateliers</Link>
-              <Link to="/journal" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">Journal</Link>
-              <Link to="/studio" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">Open an atelier</Link>
+              <Link to="/shop" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">
+                Shop the collection
+              </Link>
+              <Link to="/ateliers" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">
+                Ateliers
+              </Link>
+              <Link to="/journal" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">
+                Journal
+              </Link>
+              <Link to="/studio" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">
+                Open an atelier
+              </Link>
             </div>
           </div>
           <div>
-            <h4 className="mb-5 text-[10px] font-medium uppercase tracking-[0.18em] text-gold-600">House</h4>
+            <h4 className="mb-5 text-[10px] font-medium uppercase tracking-[0.18em] text-gold-600">
+              House
+            </h4>
             <div className="flex flex-col">
-              <a href={`mailto:${CONTACT_EMAIL}`} className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">Concierge</a>
-              <Link to="/privacy" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">Privacy</Link>
-              <Link to="/terms" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">Terms</Link>
+              <Link to="/desk" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">
+                Concierge
+              </Link>
+              <Link to="/privacy" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">
+                Privacy
+              </Link>
+              <Link to="/terms" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">
+                Terms
+              </Link>
             </div>
           </div>
         </div>
+
         <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-border pt-8 sm:flex-row sm:items-center">
           <p className="text-xs font-light tracking-wide text-charcoal-400">
             © {new Date().getFullYear()} Drapé Collective. All rights reserved.
@@ -50,7 +68,9 @@ export function SiteFooter() {
               className="h-10 rounded-lg border border-border bg-ivory-50 px-3 text-xs text-charcoal-700"
             >
               {CURRENCIES.map((c) => (
-                <option key={c.code} value={c.code}>{c.code} · {c.label}</option>
+                <option key={c.code} value={c.code}>
+                  {c.code} · {c.label}
+                </option>
               ))}
             </select>
           </label>

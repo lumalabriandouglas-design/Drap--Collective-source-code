@@ -1,5 +1,6 @@
 import type { Designer, Lookbook, Product } from "@/lib/types";
 
+/** Public anon key — the same one already in the live odrapecollective.com client. */
 const SUPABASE_URL = "https://fpvbhlbqojxrgnvxpcng.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdmJobGJxb2p4cmdudnhwY25nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2ODk4ODYsImV4cCI6MjA5NjI2NTg4Nn0.MHQq6Sq3xLyLxE3ZqcNW9_5k4knMKB4fp7vH7Ja-Ees";
@@ -116,16 +117,22 @@ function productTags(name: string, category: string, materials: string[]): strin
   const tags = new Set<string>([category.toLowerCase()]);
   const hay = name.toLowerCase();
   if (hay.includes("wedding")) {
-    tags.add("bridal"); tags.add("ivory"); tags.add("evening");
+    tags.add("bridal");
+    tags.add("ivory");
+    tags.add("evening");
   }
   if (hay.includes("party")) {
-    tags.add("party"); tags.add("evening"); tags.add("bold");
+    tags.add("party");
+    tags.add("evening");
+    tags.add("bold");
   }
   if (hay.includes("dinner") || hay.includes("corset")) {
-    tags.add("evening"); tags.add("sculptural");
+    tags.add("evening");
+    tags.add("sculptural");
   }
   if (hay.includes("two-piece") || hay.includes("2piece")) {
-    tags.add("everyday"); tags.add("ready-to-wear");
+    tags.add("everyday");
+    tags.add("ready-to-wear");
   }
   for (const material of materials) tags.add(material.toLowerCase());
   return [...tags];
@@ -139,7 +146,9 @@ async function rest<T>(path: string): Promise<T> {
       Accept: "application/json",
     },
   });
-  if (!response.ok) throw new Error(`Floor request failed (${response.status})`);
+  if (!response.ok) {
+    throw new Error(`Floor request failed (${response.status})`);
+  }
   return (await response.json()) as T;
 }
 
@@ -151,6 +160,7 @@ function buildLookbooks(products: Product[], designers: Designer[]): Lookbook[] 
   );
   const zion = designers.find((d) => /zion/i.test(d.name));
   const tassy = designers.find((d) => /tassy/i.test(d.name));
+
   const stories: Lookbook[] = [];
   if (wedding) {
     stories.push({
@@ -159,10 +169,12 @@ function buildLookbooks(products: Product[], designers: Designer[]): Lookbook[] 
       title: "Ceremony cloth",
       subtitle: "House of Zion, Julaina",
       coverUrl: wedding.imageUrls[0] ?? "/images/hero.jpg",
-      body: "A lace mermaid wedding dress listed from Julaina — one of the first ceremony pieces on the Drapé floor.",
+      body: "A lace mermaid wedding dress listed from Julaina — one of the first ceremony pieces on the Drapé floor. The atelier, House of Zion, works in Kampala and posts the cloth as it is made: no borrowed lookbook, no borrowed city.",
       productSlugs: [
         wedding.slug,
-        ...products.filter((p) => p.designer.slug === wedding.designer.slug && p.slug !== wedding.slug).map((p) => p.slug),
+        ...products
+          .filter((p) => p.designer.slug === wedding.designer.slug && p.slug !== wedding.slug)
+          .map((p) => p.slug),
       ].slice(0, 4),
       designerSlug: zion?.slug ?? wedding.designer.slug,
       designerName: wedding.designer.name,
@@ -175,7 +187,7 @@ function buildLookbooks(products: Product[], designers: Designer[]): Lookbook[] 
       title: "After dark",
       subtitle: "Draped corset, listed as a dinner dress",
       coverUrl: dinner.imageUrls[0] ?? "/images/hero.jpg",
-      body: "The designer called it a dinner dress: draped corset long dress. Bridal satin, size XS.",
+      body: "The designer called it a dinner dress and wrote four words: draped corset long dress. Bridal satin, size XS, one hundred and thirty-five thousand shillings. That is the whole note — and the silhouette does the rest.",
       productSlugs: [dinner.slug],
       designerSlug: dinner.designer.slug,
       designerName: dinner.designer.name,
@@ -188,7 +200,7 @@ function buildLookbooks(products: Product[], designers: Designer[]): Lookbook[] 
       title: "On the mall floor",
       subtitle: "Tassy Stitches, City Mall",
       coverUrl: party.imageUrls[0] ?? "/images/hero.jpg",
-      body: "Tassy Stitches lists from City Mall: gold sequin party dresses, sandwich cloth, sizes through XXL.",
+      body: "Tassy Stitches lists from City Mall: gold sequin party dresses, sandwich cloth, sizes through XXL. This is the Kampala floor as it actually stands — ateliers posting the work they have on the rail, priced in shillings.",
       productSlugs: products.filter((p) => p.designer.slug === party.designer.slug).map((p) => p.slug),
       designerSlug: tassy?.slug ?? party.designer.slug,
       designerName: party.designer.name,
@@ -221,10 +233,16 @@ export async function loadFloor(force = false): Promise<Floor> {
     const name = designerName(profile);
     const { city, country } = kampalaLocation(profile.location);
     const pieces = published.filter((p) => p.user_id === profile.id);
-    const cover = pieces[0]?.image_urls?.[0] || profile.profile_photo_url || "/images/products/studio-2.jpg";
+    const cover =
+      pieces[0]?.image_urls?.[0] ||
+      profile.profile_photo_url ||
+      "/images/products/studio-2.jpg";
     return {
       id: numericId(profile.id),
-      slug: slugify(name === "Independent Designer" ? `atelier-${profile.id.slice(0, 6)}` : name, profile.id),
+      slug: slugify(
+        name === "Independent Designer" ? `atelier-${profile.id.slice(0, 6)}` : name,
+        profile.id,
+      ),
       name,
       city,
       country,
@@ -233,6 +251,7 @@ export async function loadFloor(force = false): Promise<Floor> {
       imageUrl: cover,
       featured: Boolean(profile.brand_name?.trim()) && pieces.length > 0,
       userId: profile.id,
+      authId: profile.user_id ?? profile.id,
       pieceCount: pieces.length,
     };
   });
@@ -250,6 +269,7 @@ export async function loadFloor(force = false): Promise<Floor> {
         city: "Kampala",
         country: "Uganda",
         imageUrl: "/images/products/studio-2.jpg",
+        userId: null,
       } satisfies Product["designer"]);
     const name = titleCase(row.name?.trim() || "Untitled piece");
     const materials = (row.materials ?? []).map(String).filter(Boolean);
@@ -280,7 +300,9 @@ export async function loadFloor(force = false): Promise<Floor> {
   const lookbooks = buildLookbooks(products, designers);
   const floor: Floor = {
     products,
-    designers: designers.sort((a, b) => Number(b.featured) - Number(a.featured) || b.pieceCount - a.pieceCount),
+    designers: designers.sort(
+      (a, b) => Number(b.featured) - Number(a.featured) || b.pieceCount - a.pieceCount,
+    ),
     lookbooks,
   };
   cache = { at: Date.now(), floor };

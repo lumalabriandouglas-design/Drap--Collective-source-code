@@ -1,6 +1,5 @@
 import { liveFloor } from "@/lib/catalog-core";
 import { getFloorSession } from "@/lib/floor-auth";
-import { CONTACT_EMAIL } from "@/lib/constants";
 import type { OrderSummary } from "@/lib/types";
 
 export type CheckoutInput = {
@@ -156,17 +155,29 @@ export async function listOrders() {
 }
 
 export async function sendInquiry(opts: {
-  data: { productId?: number; designerId?: number; message: string };
+  data: {
+    productId?: number;
+    designerId?: number;
+    message: string;
+    atelierId?: string;
+    atelierName?: string;
+    atelierSlug?: string;
+    pieceSlug?: string;
+    pieceName?: string;
+    pieceImage?: string;
+  };
 }) {
-  if (!getFloorSession() && (import.meta.env.DEV || import.meta.env.SSR)) {
-    try {
-      const { sendInquiryRpc } = await import("@/lib/commerce-rpc");
-      return await sendInquiryRpc({ data: opts.data });
-    } catch {
-      /* preview */
-    }
+  const { openDeskNote } = await import("@/lib/desk");
+  if (!opts.data.atelierId && !opts.data.atelierSlug) {
+    throw new Error("This atelier cannot be reached from here.");
   }
-  const message = opts.data.message.trim();
-  if (message.length < 8) throw new Error("Write a little more so the atelier can reply.");
-  throw new Error(`Inquiries from this preview reach the house at ${CONTACT_EMAIL}.`);
+  return openDeskNote({
+    atelierId: opts.data.atelierId || String(opts.data.designerId ?? ""),
+    atelierName: opts.data.atelierName || "Atelier",
+    atelierSlug: opts.data.atelierSlug,
+    pieceSlug: opts.data.pieceSlug,
+    pieceName: opts.data.pieceName,
+    pieceImage: opts.data.pieceImage,
+    message: opts.data.message,
+  });
 }
