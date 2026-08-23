@@ -1,4 +1,5 @@
 import { loadFloor, type Floor } from "@/lib/live-floor";
+import { mergePreviewRail } from "@/lib/preview-rail";
 import type { Designer, Lookbook, Product } from "@/lib/types";
 
 export type ProductFilter = {
@@ -10,11 +11,13 @@ export type ProductFilter = {
 };
 
 export async function liveFloor(): Promise<Floor> {
+  let floor: Floor;
   try {
-    return await loadFloor();
+    floor = await loadFloor();
   } catch {
-    return { products: [], designers: [], lookbooks: [] };
+    floor = { products: [], designers: [], lookbooks: [] };
   }
+  return mergePreviewRail(floor);
 }
 
 export function filterProducts(products: Product[], data: ProductFilter) {

@@ -6,6 +6,8 @@ export type BagItem = {
   slug: string;
   name: string;
   designerName: string;
+  designerSlug?: string;
+  designerUserId?: string | null;
   image: string;
   priceCents: number;
   size: string;

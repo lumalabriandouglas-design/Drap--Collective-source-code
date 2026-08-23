@@ -14,6 +14,7 @@ import { RedirectToSignIn } from "@/lib/auth/gates";
 import { houseError } from "@/lib/errors";
 import { claimRole } from "@/lib/roles";
 import { getMyStudio, openAtelier } from "@/lib/studio";
+import { isPreviewPiece } from "@/lib/preview-rail";
 import { useHouseRole } from "@/lib/use-role";
 
 export const Route = createFileRoute("/studio/")({ component: Studio });
@@ -40,6 +41,8 @@ function Studio() {
   const atelier = studio.data?.atelier;
   const pieces = studio.data?.pieces ?? [];
   const cover = atelier?.imageUrl || pieces[0]?.imageUrls[0] || "/images/products/studio-2.jpg";
+  const previewPieces = pieces.filter(isPreviewPiece);
+  const livePieces = pieces.filter((piece) => !isPreviewPiece(piece));
 
   async function onOpen(e: FormEvent) {
     e.preventDefault();
@@ -207,12 +210,14 @@ function Studio() {
             <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">The rail</p>
             <h2 className="mt-2 font-serif text-3xl text-charcoal-800">On the floor</h2>
           </div>
-          <p className="text-xs tabular-nums text-charcoal-400">{pieces.length} piece{pieces.length === 1 ? "" : "s"}</p>
+          <p className="text-xs tabular-nums text-charcoal-400">
+            {livePieces.length} live · {previewPieces.length} preview
+          </p>
         </div>
-        {pieces.length === 0 ? (
+        {livePieces.length === 0 && previewPieces.length === 0 ? (
           <RoomEmpty
             title="The rail is empty"
-            body="Your atelier is open. List a piece when you are ready — collectors will meet it in the showroom."
+            body="Your atelier is open. List a piece when you are ready — it will sit on this preview until the house opens it on the live floor."
             action={
               <Button asChild>
                 <Link to="/studio/new">List a piece</Link>
@@ -220,7 +225,21 @@ function Studio() {
             }
           />
         ) : (
-          <ProductGrid products={pieces} showDesigner={false} />
+          <>
+            {livePieces.length > 0 ? <ProductGrid products={livePieces} showDesigner={false} /> : null}
+            {previewPieces.length > 0 ? (
+              <div className="mt-14">
+                <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">On this preview</p>
+                <h3 className="mt-2 font-serif text-2xl text-charcoal-800">Not yet on the live floor</h3>
+                <p className="mt-2 max-w-xl text-sm font-light text-charcoal-500">
+                  These pieces are only in this preview. The Kampala houses already listed stay as they are.
+                </p>
+                <div className="mt-8">
+                  <ProductGrid products={previewPieces} showDesigner={false} />
+                </div>
+              </div>
+            ) : null}
+          </>
         )}
       </section>
     </HouseRoom>

@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useBag } from "@/lib/bag-store";
 import { getProduct, listRelated } from "@/lib/catalog";
 import { sendInquiry, toggleWishlist } from "@/lib/commerce";
+import { isPreviewPiece } from "@/lib/preview-rail";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
 export const Route = createFileRoute("/shop/$slug")({ component: ProductPage });
@@ -87,6 +88,8 @@ function ProductPage() {
       slug: piece.slug,
       name: piece.name,
       designerName: piece.designer.name,
+      designerSlug: piece.designer.slug,
+      designerUserId: piece.designer.userId,
       image: images[0],
       priceCents: piece.priceCents,
       size: selectedSize,
@@ -188,6 +191,11 @@ function ProductPage() {
           {product.leadTime && (
             <p className="mt-4 text-xs uppercase tracking-[0.12em] text-charcoal-400">
               {product.leadTime}
+            </p>
+          )}
+          {isPreviewPiece(product) && (
+            <p className="mt-3 text-[10px] font-medium uppercase tracking-[0.16em] text-gold-600">
+              On this preview only
             </p>
           )}
 

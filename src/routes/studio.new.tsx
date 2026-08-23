@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { HouseRoom, RoomSkeleton } from "@/components/house-room";
@@ -19,6 +19,7 @@ export const Route = createFileRoute("/studio/new")({ component: NewPiece });
 function NewPiece() {
   const { user, isPending, isDesigner } = useHouseRole();
   const navigate = useNavigate();
+  const client = useQueryClient();
   const storage = useQuery({ queryKey: ["storage"], queryFn: () => storageStatus() });
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -97,7 +98,10 @@ function NewPiece() {
           leadTime: form.leadTime,
         },
       });
-      toast.success("Listed on the floor");
+      toast.success("Listed on this preview");
+      await client.invalidateQueries({ queryKey: ["studio"] });
+      await client.invalidateQueries({ queryKey: ["products"] });
+      await client.invalidateQueries({ queryKey: ["designers"] });
       void navigate({ to: "/shop/$slug", params: { slug: result.slug } });
     } catch (err) {
       toast.error(houseError(err));
@@ -113,7 +117,7 @@ function NewPiece() {
       lede={
         storage.data?.r2
           ? "Photographs go to Cloudflare. The showroom keeps the cloth at full visual quality."
-          : "Photographs are compressed here. Existing pieces already on the live floor stay where they are."
+          : "The photograph stays in this preview. Existing live pieces are not overwritten — this listing is only on the preview rail until the house opens it on the floor."
       }
       actions={
         <Button asChild variant="outline">
@@ -220,7 +224,7 @@ function NewPiece() {
           </div>
         </div>
         <Button type="submit" disabled={busy}>
-          {busy ? "Listing…" : "Publish to the floor"}
+          {busy ? "Listing…" : "List on this preview"}
         </Button>
       </form>
     </HouseRoom>

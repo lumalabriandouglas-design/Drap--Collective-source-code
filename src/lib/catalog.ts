@@ -8,13 +8,18 @@ import {
   relatedOf,
   type ProductFilter,
 } from "@/lib/catalog-core";
+import { listPreviewPieces } from "@/lib/preview-rail";
 
 export async function listProducts(opts: { data?: ProductFilter } = {}) {
   const data = opts.data ?? {};
   if (import.meta.env.DEV || import.meta.env.SSR) {
     try {
       const { listProductsRpc } = await import("@/lib/catalog-rpc");
-      return await listProductsRpc({ data });
+      const rows = await listProductsRpc({ data });
+      if (rows.length) {
+        const extra = listPreviewPieces().filter((p) => !rows.some((row) => row.slug === p.slug));
+        return filterProducts([...extra, ...rows], data);
+      }
     } catch {
       /* live floor */
     }
@@ -26,12 +31,17 @@ export async function getProduct(opts: { data: string }) {
   if (import.meta.env.DEV || import.meta.env.SSR) {
     try {
       const { getProductRpc } = await import("@/lib/catalog-rpc");
-      return await getProductRpc({ data: opts.data });
+      const found = await getProductRpc({ data: opts.data });
+      if (found) return found;
     } catch {
       /* live floor */
     }
   }
-  return (await liveFloor()).products.find((p) => p.slug === opts.data) ?? null;
+  return (
+    (await liveFloor()).products.find((p) => p.slug === opts.data) ??
+    listPreviewPieces().find((p) => p.slug === opts.data) ??
+    null
+  );
 }
 
 export async function listRelated(opts: {
@@ -64,7 +74,8 @@ export async function getDesigner(opts: { data: string }) {
   if (import.meta.env.DEV || import.meta.env.SSR) {
     try {
       const { getDesignerRpc } = await import("@/lib/catalog-rpc");
-      return await getDesignerRpc({ data: opts.data });
+      const found = await getDesignerRpc({ data: opts.data });
+      if (found) return found;
     } catch {
       /* live floor */
     }
@@ -88,7 +99,8 @@ export async function getLookbook(opts: { data: string }) {
   if (import.meta.env.DEV || import.meta.env.SSR) {
     try {
       const { getLookbookRpc } = await import("@/lib/catalog-rpc");
-      return await getLookbookRpc({ data: opts.data });
+      const found = await getLookbookRpc({ data: opts.data });
+      if (found) return found;
     } catch {
       /* live floor */
     }
