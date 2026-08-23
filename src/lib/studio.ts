@@ -5,6 +5,11 @@ import type { AtelierProfile, Product } from "@/lib/types";
 const PREVIEW_WRITE =
   "Your existing pieces are already on the floor. Listing new work from this preview will open with the full house.";
 
+function sameHouse(left: string | null | undefined, right: string | null | undefined) {
+  if (!left || !right) return false;
+  return left.toLowerCase().trim() === right.toLowerCase().trim();
+}
+
 async function studioFromFloor(): Promise<{ atelier: AtelierProfile | null; pieces: Product[] }> {
   const session = getFloorSession();
   if (!session) return { atelier: null, pieces: [] };
@@ -14,6 +19,7 @@ async function studioFromFloor(): Promise<{ atelier: AtelierProfile | null; piec
   );
   const designer =
     floor.designers.find((d) => d.userId === session.profileId || d.userId === session.userId) ??
+    floor.designers.find((d) => sameHouse(d.name, session.brandName) || sameHouse(d.name, session.displayName)) ??
     (pieces[0]
       ? floor.designers.find((d) => d.slug === pieces[0].designer.slug)
       : undefined);
@@ -32,6 +38,7 @@ async function studioFromFloor(): Promise<{ atelier: AtelierProfile | null; piec
 }
 
 export async function getMyStudio() {
+  if (getFloorSession()) return studioFromFloor();
   if (import.meta.env.DEV || import.meta.env.SSR) {
     try {
       const { getMyStudioRpc } = await import("@/lib/studio-rpc");
@@ -46,12 +53,15 @@ export async function getMyStudio() {
 export async function openAtelier(opts: {
   data: { name: string; city: string; country: string; bio: string };
 }) {
+  if (getFloorSession()) {
+    const existing = await studioFromFloor();
+    if (existing.atelier) return { slug: existing.atelier.slug };
+    throw new Error(PREVIEW_WRITE);
+  }
   if (import.meta.env.DEV || import.meta.env.SSR) {
     const { openAtelierRpc } = await import("@/lib/studio-rpc");
     return await openAtelierRpc({ data: opts.data });
   }
-  const existing = await studioFromFloor();
-  if (existing.atelier) return { slug: existing.atelier.slug };
   throw new Error(PREVIEW_WRITE);
 }
 
@@ -66,6 +76,7 @@ export async function listPiece(opts: {
     leadTime: string;
   };
 }) {
+  if (getFloorSession()) throw new Error(PREVIEW_WRITE);
   if (import.meta.env.DEV || import.meta.env.SSR) {
     const { listPieceRpc } = await import("@/lib/studio-rpc");
     return await listPieceRpc({ data: opts.data });
@@ -74,6 +85,16 @@ export async function listPiece(opts: {
 }
 
 export async function storageStatus() {
+  if (getFloorSession()) {
+    return {
+      r2: false,
+      account: false,
+      bucket: false,
+      keys: false,
+      publicUrl: false,
+      missing: ["preview"],
+    };
+  }
   if (import.meta.env.DEV || import.meta.env.SSR) {
     try {
       const { storageStatusRpc } = await import("@/lib/studio-rpc");
@@ -95,6 +116,7 @@ export async function storageStatus() {
 export async function uploadPiecePhoto(opts: {
   data: { filename: string; mime: string; data: string };
 }) {
+  if (getFloorSession()) throw new Error(PREVIEW_WRITE);
   if (import.meta.env.DEV || import.meta.env.SSR) {
     const { uploadPiecePhotoRpc } = await import("@/lib/studio-rpc");
     return await uploadPiecePhotoRpc({ data: opts.data });

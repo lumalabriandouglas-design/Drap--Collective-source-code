@@ -43,8 +43,12 @@ function writeJson(key: string, value: unknown) {
   }
 }
 
+function preferLocalLedger() {
+  return Boolean(getFloorSession()) || !(import.meta.env.DEV || import.meta.env.SSR);
+}
+
 export async function listWishlist() {
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (!preferLocalLedger()) {
     try {
       const { listWishlistRpc } = await import("@/lib/commerce-rpc");
       return await listWishlistRpc();
@@ -57,7 +61,7 @@ export async function listWishlist() {
 }
 
 export async function toggleWishlist(opts: { data: number }) {
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (!preferLocalLedger()) {
     try {
       const { toggleWishlistRpc } = await import("@/lib/commerce-rpc");
       return await toggleWishlistRpc({ data: opts.data });
@@ -72,7 +76,7 @@ export async function toggleWishlist(opts: { data: number }) {
 }
 
 export async function listSavedProducts() {
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (!preferLocalLedger()) {
     try {
       const { listSavedProductsRpc } = await import("@/lib/commerce-rpc");
       return await listSavedProductsRpc();
@@ -94,17 +98,7 @@ export async function listSavedProducts() {
   }));
 }
 
-export async function placeOrder(opts: { data: CheckoutInput }) {
-  if (import.meta.env.DEV || import.meta.env.SSR) {
-    try {
-      const { placeOrderRpc } = await import("@/lib/commerce-rpc");
-      return await placeOrderRpc({ data: opts.data });
-    } catch {
-      /* local */
-    }
-  }
-  if (!getFloorSession()) throw new Error("Sign in to place an order.");
-  const data = opts.data;
+function writeLocalOrder(data: CheckoutInput) {
   const name = data.shippingName.trim();
   const line1 = data.shippingLine1.trim();
   const city = data.shippingCity.trim();
@@ -136,8 +130,21 @@ export async function placeOrder(opts: { data: CheckoutInput }) {
   return { orderId: order.id, totalCents: total };
 }
 
-export async function listOrders() {
+export async function placeOrder(opts: { data: CheckoutInput }) {
+  if (getFloorSession()) return writeLocalOrder(opts.data);
   if (import.meta.env.DEV || import.meta.env.SSR) {
+    try {
+      const { placeOrderRpc } = await import("@/lib/commerce-rpc");
+      return await placeOrderRpc({ data: opts.data });
+    } catch {
+      /* local */
+    }
+  }
+  throw new Error("Sign in to place an order.");
+}
+
+export async function listOrders() {
+  if (!preferLocalLedger()) {
     try {
       const { listOrdersRpc } = await import("@/lib/commerce-rpc");
       return await listOrdersRpc();
@@ -151,7 +158,7 @@ export async function listOrders() {
 export async function sendInquiry(opts: {
   data: { productId?: number; designerId?: number; message: string };
 }) {
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (!getFloorSession() && (import.meta.env.DEV || import.meta.env.SSR)) {
     try {
       const { sendInquiryRpc } = await import("@/lib/commerce-rpc");
       return await sendInquiryRpc({ data: opts.data });
