@@ -11,6 +11,7 @@ export const CURRENCIES = [
 
 export type CurrencyCode = (typeof CURRENCIES)[number]["code"];
 
+/** Approximate mid-market rates versus USD. Listing prices are stored in UGX. */
 export const USD_RATES: Record<CurrencyCode, number> = {
   UGX: 3650,
   USD: 1,
@@ -22,6 +23,7 @@ export const USD_RATES: Record<CurrencyCode, number> = {
   GHS: 15.4,
 };
 
+/** `amountUgx` is the number the designer posted (e.g. 350000). */
 export function formatMoney(amountUgx: number, currency: CurrencyCode = "UGX") {
   const usd = amountUgx / USD_RATES.UGX;
   const amount = currency === "UGX" ? amountUgx : usd * USD_RATES[currency];
@@ -36,5 +38,20 @@ export function formatMoney(amountUgx: number, currency: CurrencyCode = "UGX") {
     }).format(amount);
   } catch {
     return `${meta.symbol}${Math.round(amount).toLocaleString()}`;
+  }
+}
+
+export function formatDay(iso: string | null | undefined) {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat("en-UG", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(date);
+  } catch {
+    return "";
   }
 }

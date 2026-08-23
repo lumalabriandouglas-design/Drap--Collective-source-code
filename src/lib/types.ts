@@ -67,4 +67,5 @@ export type AtelierProfile = {
   city: string;
   country: string;
   bio: string;
+  imageUrl?: string | null;
 };

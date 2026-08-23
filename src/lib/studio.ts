@@ -33,6 +33,7 @@ async function studioFromFloor(): Promise<{ atelier: AtelierProfile | null; piec
     city: designer?.city ?? "Kampala",
     country: designer?.country ?? "Uganda",
     bio: designer?.bio ?? "",
+    imageUrl: designer?.imageUrl || pieces[0]?.imageUrls[0] || null,
   };
   return { atelier, pieces };
 }
