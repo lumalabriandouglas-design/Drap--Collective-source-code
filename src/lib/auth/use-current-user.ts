@@ -1,6 +1,7 @@
-import { authClient, authEnabled } from "./client";
-import { useFloorSession, type FloorSession } from "@/lib/floor-auth";
+import { authEnabled } from "./auth-enabled";
+import { useFloorAuth, type FloorSession } from "@/lib/floor-auth";
 
+/** Normalized user shape used across the app, auth on or off. */
 export type AppUser = {
   id: string;
   displayName: string | null;
@@ -32,29 +33,14 @@ function fromFloor(session: FloorSession): AppUser {
   };
 }
 
+/**
+ * Current user + loading state.
+ * Static Vercel house → live-floor email/password session only (no /api/auth).
+ */
 export function useCurrentUserState(): CurrentUserState {
-  const floor = useFloorSession();
-  const spa = import.meta.env.VITE_SPA === "true";
+  const { session: floor, ready } = useFloorAuth();
   if (!authEnabled) return { user: DEV_USER, isPending: false };
-  if (spa) {
-    return { user: floor ? fromFloor(floor) : null, isPending: false };
-  }
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- spa/authEnabled are constant for the app's lifetime
-  const { data, isPending } = authClient.useSession();
-  if (floor) return { user: fromFloor(floor), isPending: false };
-  const user = data?.user;
-  return {
-    user: user
-      ? {
-          id: user.id,
-          displayName: user.name ?? null,
-          primaryEmail: user.email ?? null,
-          profileImageUrl: user.image ?? null,
-          isDevFallback: false,
-        }
-      : null,
-    isPending,
-  };
+  return { user: floor ? fromFloor(floor) : null, isPending: !ready };
 }
 
 export function useCurrentUser(): AppUser | null {

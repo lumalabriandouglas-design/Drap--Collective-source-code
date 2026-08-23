@@ -11,6 +11,7 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { AuthProvider } from "@/lib/auth/provider";
+import { staticFloor } from "@/lib/house-mode";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Drapé Collective";
@@ -57,27 +58,35 @@ function RootDocument() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const bare = pathname === "/login" || pathname === "/welcome";
 
+  const inner = (
+    <>
+      <PreviewHostBridge />
+      <AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          {bare ? null : <SiteHeader />}
+          <Outlet />
+          {bare ? null : <SiteFooter />}
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              className:
+                "font-sans text-sm border-border bg-ivory-50 text-charcoal-800",
+            }}
+          />
+        </QueryClientProvider>
+      </AuthProvider>
+    </>
+  );
+
+  if (staticFloor) return inner;
+
   return (
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body className="min-h-dvh bg-background text-foreground">
-        <PreviewHostBridge />
-        <AuthProvider>
-          <QueryClientProvider client={queryClient}>
-            {bare ? null : <SiteHeader />}
-            <Outlet />
-            {bare ? null : <SiteFooter />}
-            <Toaster
-              position="top-center"
-              toastOptions={{
-                className:
-                  "font-sans text-sm border-border bg-ivory-50 text-charcoal-800",
-              }}
-            />
-          </QueryClientProvider>
-        </AuthProvider>
+        {inner}
         <Scripts />
       </body>
     </html>
