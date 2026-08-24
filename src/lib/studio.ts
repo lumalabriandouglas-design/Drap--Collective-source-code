@@ -139,16 +139,21 @@ export async function listPiece(opts: {
 }
 
 export async function storageStatus() {
-  if (getFloorSession()) {
-    return {
-      r2: false,
-      account: false,
-      bucket: false,
-      keys: false,
-      publicUrl: false,
-      preview: true,
-      missing: [] as string[],
-    };
+  try {
+    const response = await fetch("/api/storage");
+    if (response.ok) {
+      return (await response.json()) as {
+        r2: boolean;
+        account: boolean;
+        bucket: boolean;
+        keys: boolean;
+        publicUrl: boolean;
+        preview?: boolean;
+        missing: string[];
+      };
+    }
+  } catch {
+    /* local house */
   }
   if (import.meta.env.DEV || import.meta.env.SSR) {
     try {
@@ -165,26 +170,53 @@ export async function storageStatus() {
     keys: false,
     publicUrl: false,
     preview: true,
-    missing: ["preview"],
+    missing: ["R2_PUBLIC_BASE"],
   };
 }
 
 export async function uploadPiecePhoto(opts: {
   data: { filename: string; mime: string; data: string };
 }) {
+  if (!opts.data.data?.startsWith("data:image")) {
+    throw new Error("That file could not be stored.");
+  }
   const session = getFloorSession();
-  if (session) {
-    if (!opts.data.data?.startsWith("data:image")) {
-      throw new Error("That file could not be stored.");
+  try {
+    const response = await fetch("/api/photo", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+      },
+      body: JSON.stringify(opts.data),
+    });
+    const payload = (await response.json().catch(() => ({}))) as {
+      url?: string;
+      backend?: "r2" | "preview";
+      error?: string;
+    };
+    if (response.ok && payload.url) {
+      return { url: payload.url, backend: payload.backend ?? "r2" };
     }
-    return { url: opts.data.data, backend: "preview" as const };
+    if (response.status === 503) {
+      throw new Error(
+        payload.error ||
+          "Cloudflare is not connected yet. Add the R2 keys on Vercel so photographs leave the house database.",
+      );
+    }
+    if (response.status !== 404) {
+      throw new Error(payload.error || "Could not store that photograph.");
+    }
+  } catch (err) {
+    if (err instanceof TypeError) {
+      /* no /api on this local preview */
+    } else if (err instanceof Error) {
+      throw err;
+    }
   }
   if (import.meta.env.DEV || import.meta.env.SSR) {
     const { uploadPiecePhotoRpc } = await import("@/lib/studio-rpc");
     return await uploadPiecePhotoRpc({ data: opts.data });
   }
-  if (!opts.data.data?.startsWith("data:image")) {
-    throw new Error("That file could not be stored.");
-  }
-  return { url: opts.data.data, backend: "preview" as const };
+  throw new Error("Photographs now go to Cloudflare. Connect R2 on this preview to list a piece.");
 }
