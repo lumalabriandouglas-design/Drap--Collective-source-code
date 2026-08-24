@@ -17,6 +17,7 @@ import { Route as AteliersRouteImport } from './routes/ateliers'
 import { Route as BagRouteImport } from './routes/bag'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as DeskRouteImport } from './routes/desk'
+import { Route as JoinRouteImport } from './routes/join'
 import { Route as JournalRouteImport } from './routes/journal'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -77,6 +78,11 @@ const CheckoutRoute = CheckoutRouteImport.update({
 const DeskRoute = DeskRouteImport.update({
   id: '/desk',
   path: '/desk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JoinRoute = JoinRouteImport.update({
+  id: '/join',
+  path: '/join',
   getParentRoute: () => rootRouteImport,
 } as any)
 const JournalRoute = JournalRouteImport.update({
@@ -194,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/bag': typeof BagRoute
   '/checkout': typeof CheckoutRoute
   '/desk': typeof DeskRouteWithChildren
+  '/join': typeof JoinRoute
   '/journal': typeof JournalRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
@@ -223,6 +230,7 @@ export interface FileRoutesByTo {
   '/atelier-house': typeof AtelierHouseRoute
   '/bag': typeof BagRoute
   '/checkout': typeof CheckoutRoute
+  '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/quiz': typeof QuizRoute
@@ -252,6 +260,7 @@ export interface FileRoutesById {
   '/bag': typeof BagRoute
   '/checkout': typeof CheckoutRoute
   '/desk': typeof DeskRouteWithChildren
+  '/join': typeof JoinRoute
   '/journal': typeof JournalRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
@@ -285,6 +294,7 @@ export interface FileRouteTypes {
     | '/bag'
     | '/checkout'
     | '/desk'
+    | '/join'
     | '/journal'
     | '/login'
     | '/privacy'
@@ -314,6 +324,7 @@ export interface FileRouteTypes {
     | '/atelier-house'
     | '/bag'
     | '/checkout'
+    | '/join'
     | '/login'
     | '/privacy'
     | '/quiz'
@@ -342,6 +353,7 @@ export interface FileRouteTypes {
     | '/bag'
     | '/checkout'
     | '/desk'
+    | '/join'
     | '/journal'
     | '/login'
     | '/privacy'
@@ -374,6 +386,7 @@ export interface RootRouteChildren {
   BagRoute: typeof BagRoute
   CheckoutRoute: typeof CheckoutRoute
   DeskRoute: typeof DeskRouteWithChildren
+  JoinRoute: typeof JoinRoute
   JournalRoute: typeof JournalRouteWithChildren
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
@@ -443,6 +456,13 @@ declare module '@tanstack/react-router' {
       path: '/desk'
       fullPath: '/desk'
       preLoaderRoute: typeof DeskRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join': {
+      id: '/join'
+      path: '/join'
+      fullPath: '/join'
+      preLoaderRoute: typeof JoinRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/journal': {
@@ -668,6 +688,7 @@ const rootRouteChildren: RootRouteChildren = {
   BagRoute: BagRoute,
   CheckoutRoute: CheckoutRoute,
   DeskRoute: DeskRouteWithChildren,
+  JoinRoute: JoinRoute,
   JournalRoute: JournalRouteWithChildren,
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,

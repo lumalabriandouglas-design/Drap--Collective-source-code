@@ -15,9 +15,13 @@ export function houseError(err: unknown): string {
   if (msg.includes("provider_config") || msg.includes("popup blocked") || msg.includes("cancelled or failed")) {
     return "Use the email on your atelier account — Google and X are only for new collectors here.";
   }
-  if (msg.includes("already registered") || msg.includes("already exists") || msg.includes("user already")) {
+  if (msg.includes("already registered") || msg.includes("already exists") || msg.includes("already in the house") || msg.includes("user already")) {
     return "This email is already in the house. Sign in instead.";
   }
+  if (msg.includes("database error saving") || msg.includes("unexpected_failure")) {
+    return "The house could not open that door. Try again in a moment.";
+  }
+  if (msg.includes("check your email")) return "Check your email to open the door, then sign in.";
   if (msg.includes("password") && (msg.includes("8") || msg.includes("short") || msg.includes("least"))) {
     return "Use at least 8 characters for the password.";
   }

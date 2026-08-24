@@ -33,8 +33,8 @@ export function SiteFooter() {
               <Link to="/journal" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">
                 Journal
               </Link>
-              <Link to="/studio" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">
-                Open an atelier
+              <Link to="/join" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">
+                Join the house
               </Link>
             </div>
           </div>

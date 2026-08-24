@@ -15,8 +15,7 @@ export const Route = createFileRoute("/atelier-house")({ component: AtelierHouse
 const FILTERS = [
   { id: "all", label: "All" },
   { id: "designer", label: "Ateliers" },
-  { id: "client", label: "Collectors" },
-  { id: "admin", label: "House" },
+  { id: "customer", label: "Collectors" },
 ] as const;
 type Filter = (typeof FILTERS)[number]["id"];
 
@@ -35,8 +34,9 @@ function AtelierHouse() {
     const needle = q.trim().toLowerCase();
     return profiles
       .filter((profile) => {
-        const role = (profile.role ?? "client").toLowerCase();
-        if (filter !== "all" && role !== filter) return false;
+        const role = (profile.role ?? "customer").toLowerCase();
+        if (filter === "designer" && role !== "designer" && !profile.brand_name) return false;
+        if (filter === "customer" && role !== "customer" && role !== "client") return false;
         if (!needle) return true;
         const hay = [profile.email, profile.brand_name, profile.username, profile.location, profile.role]
           .filter(Boolean)

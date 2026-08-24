@@ -42,8 +42,8 @@ type FloorProfile = {
   user_id?: string | null;
   email?: string | null;
   role: string | null;
-  brand_name?: string | null;
-  username?: string | null;
+  brand_name: string | null;
+  username: string | null;
   profile_photo_url?: string | null;
   is_suspended?: boolean | null;
 };
@@ -71,6 +71,10 @@ function mapRole(role: string | null | undefined, brandName: string | null): Flo
   if (r === "admin") return "admin";
   if (r === "designer" || brandName) return "designer";
   return "client";
+}
+
+function liveJoinRole(door: "client" | "designer"): "customer" | "designer" {
+  return door === "designer" ? "designer" : "customer";
 }
 
 function decodeJwt(token: string): { sub?: string; email?: string } {
@@ -116,6 +120,10 @@ export function clearFloorSession() {
   setFloorSession(null);
 }
 
+/**
+ * Live-floor session. On the Grok SSR house, localStorage is read after mount
+ * so the first client paint matches the server (no hydration overlay).
+ */
 export function useFloorAuth() {
   const eager = import.meta.env.VITE_SPA === "true";
   const [session, setSession] = useState<FloorSession | null>(() => (eager ? getFloorSession() : null));
@@ -189,11 +197,7 @@ async function profileFor(userId: string, email: string, accessToken: string): P
   );
 }
 
-async function userFromToken(accessToken: string): Promise<{
-  id?: string;
-  email?: string;
-  user_metadata?: { full_name?: string; name?: string };
-}> {
+async function userFromToken(accessToken: string): Promise<{ id?: string; email?: string; user_metadata?: { full_name?: string; name?: string } }> {
   const jwt = decodeJwt(accessToken);
   try {
     const res = await timedFetch(`${SUPABASE_URL}/auth/v1/user`, { headers: userHeaders(accessToken) });
@@ -211,33 +215,25 @@ async function userFromToken(accessToken: string): Promise<{
   return { id: jwt.sub, email: jwt.email };
 }
 
-export async function authenticateFloor(email: string, password: string): Promise<FloorSession> {
-  const trimmed = email.trim().toLowerCase();
-  const res = await timedFetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    headers: anonHeaders(),
-    body: JSON.stringify({ email: trimmed, password }),
-  });
-  const json = await readJson(res);
-  const accessToken = json.access_token || json.accessToken || json.data?.session?.access_token;
-  let user = json.user ?? json.data?.user ?? json.data?.session?.user;
-  if (accessToken && !user?.id) {
-    user = await userFromToken(accessToken);
-  }
-  if (!res.ok || !accessToken || !user?.id) {
-    throw new Error(
-      json.error_description || json.msg || json.message || json.error || "Could not sign in",
-    );
-  }
-  const userId = String(user.id);
-  const userEmail = String(user.email || trimmed).toLowerCase();
+async function sessionFromToken(
+  accessToken: string,
+  emailHint: string,
+  extras?: { displayName?: string; forceRole?: "client" | "designer" },
+): Promise<FloorSession> {
+  const user = await userFromToken(accessToken);
+  const jwt = decodeJwt(accessToken);
+  const userId = String(user.id || jwt.sub || "");
+  const userEmail = String(user.email || emailHint).toLowerCase();
+  if (!userId) throw new Error("Could not open the door.");
   const profile = await profileFor(userId, userEmail, accessToken);
   if (profile?.is_suspended) {
     throw new Error("This account is no longer active. Write to the house if that is a mistake.");
   }
   const brandName = profile?.brand_name?.trim() || null;
-  const role = mapRole(profile?.role, brandName);
+  let role = mapRole(profile?.role, brandName);
+  if (extras?.forceRole && role !== "admin") role = extras.forceRole;
   const displayName =
+    extras?.displayName?.trim() ||
     brandName ||
     profile?.username?.trim() ||
     user.user_metadata?.full_name ||
@@ -255,10 +251,92 @@ export async function authenticateFloor(email: string, password: string): Promis
   };
 }
 
+export async function authenticateFloor(email: string, password: string): Promise<FloorSession> {
+  const trimmed = email.trim().toLowerCase();
+  const res = await timedFetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: anonHeaders(),
+    body: JSON.stringify({ email: trimmed, password }),
+  });
+  const json = await readJson(res);
+  const accessToken = json.access_token || json.accessToken || json.data?.session?.access_token;
+  if (!res.ok || !accessToken) {
+    throw new Error(
+      json.error_description || json.msg || json.message || json.error || "Could not sign in",
+    );
+  }
+  return sessionFromToken(accessToken, trimmed);
+}
+
 export async function floorSignIn(email: string, password: string): Promise<FloorSession> {
   const session = await authenticateFloor(email, password);
   setFloorSession(session);
   return session;
+}
+
+export async function floorSignUp(input: {
+  email: string;
+  password: string;
+  name: string;
+  door: "client" | "designer";
+}): Promise<FloorSession> {
+  const door = input.door === "designer" ? "designer" : "client";
+  const trimmed = input.email.trim().toLowerCase();
+  const username = (input.name.trim() || trimmed.split("@")[0]).slice(0, 48);
+  if (input.password.length < 8) {
+    throw new Error("Use at least 8 characters for the password.");
+  }
+  const res = await timedFetch(`${SUPABASE_URL}/auth/v1/signup`, {
+    method: "POST",
+    headers: anonHeaders(),
+    body: JSON.stringify({
+      email: trimmed,
+      password: input.password,
+      data: {
+        role: liveJoinRole(door),
+        username,
+        preferred_currency: "UGX",
+      },
+    }),
+  });
+  const json = await readJson(res);
+  const combined = `${json.error_code || ""} ${json.msg || ""} ${json.message || ""} ${json.error || ""}`.toLowerCase();
+  if (combined.includes("already")) {
+    throw new Error("This email is already in the house. Sign in instead.");
+  }
+  if (!res.ok) {
+    throw new Error(json.msg || json.message || json.error_description || json.error || "Could not join the house");
+  }
+  const accessToken = json.access_token || json.accessToken || json.data?.session?.access_token;
+  if (!accessToken) {
+    throw new Error("Check your email to open the door, then sign in.");
+  }
+  const session = await sessionFromToken(accessToken, trimmed, {
+    displayName: username,
+    forceRole: door,
+  });
+  const joined: FloorSession = {
+    ...session,
+    role: door,
+    brandName: door === "designer" ? session.brandName || username : session.brandName,
+    displayName: door === "designer" ? session.brandName || username : session.displayName,
+  };
+  try {
+    await timedFetch(`${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${joined.userId}`, {
+      method: "PATCH",
+      headers: { ...userHeaders(accessToken), Prefer: "return=minimal" },
+      body: JSON.stringify({
+        username,
+        email: trimmed,
+        role: liveJoinRole(door),
+        preferred_currency: "UGX",
+      }),
+    });
+  } catch {
+    /* trigger already wrote the row */
+  }
+  setFloorSession(joined);
+  return joined;
 }
 
 export async function fetchFloorProfiles() {

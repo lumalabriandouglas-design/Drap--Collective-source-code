@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 type NavItem = {
   label: string;
-  to: "/shop" | "/ateliers" | "/journal" | "/quiz" | "/studio" | "/atelier-house" | "/account" | "/desk";
+  to: "/shop" | "/ateliers" | "/journal" | "/quiz" | "/studio" | "/atelier-house" | "/account" | "/desk" | "/join";
 };
 
 function navFor(role: string | null, signedIn: boolean): NavItem[] {
@@ -27,7 +27,7 @@ function navFor(role: string | null, signedIn: boolean): NavItem[] {
   if (signedIn) {
     return [...base, { label: "Desk", to: "/desk" }, { label: "Style Quiz", to: "/quiz" }];
   }
-  return [...base, { label: "Style Quiz", to: "/quiz" }, { label: "For Designers", to: "/studio" }];
+  return [...base, { label: "Style Quiz", to: "/quiz" }, { label: "Join", to: "/join" }];
 }
 
 export function SiteHeader() {
