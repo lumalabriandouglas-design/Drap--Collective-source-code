@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { UserButton } from "@/lib/auth/gates";
+import { HouseMenu } from "@/components/house-menu";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +18,7 @@ export function AuthSlot({ light = false }: { light?: boolean }) {
             : "[&_button]:text-charcoal-400",
         )}
       >
-        <UserButton />
+        <HouseMenu light={light} />
       </div>
     );
   }
