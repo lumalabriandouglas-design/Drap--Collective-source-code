@@ -35,8 +35,11 @@ async function studioFromFloor(): Promise<{ atelier: AtelierProfile | null; piec
       ? floor.designers.find((d) => d.slug === pieces[0].designer.slug)
       : undefined);
   const local = getPreviewAtelier(session.userId) ?? getPreviewAtelier(session.profileId);
-  if (!designer && !local && !session.brandName && pieces.length === 0) {
+  if (!designer && !local && pieces.length === 0) {
     return { atelier: null, pieces: [] };
+  }
+  if (!designer && !local) {
+    return { atelier: null, pieces };
   }
   const atelier: AtelierProfile = designer
     ? {
@@ -48,15 +51,7 @@ async function studioFromFloor(): Promise<{ atelier: AtelierProfile | null; piec
         bio: designer.bio ?? "",
         imageUrl: designer.imageUrl || pieces[0]?.imageUrls[0] || null,
       }
-    : local ?? {
-        id: 0,
-        slug: session.profileId.slice(0, 8),
-        name: session.brandName ?? session.displayName,
-        city: "Kampala",
-        country: "Uganda",
-        bio: "",
-        imageUrl: pieces[0]?.imageUrls[0] || null,
-      };
+    : local!;
   return { atelier, pieces };
 }
 
@@ -79,7 +74,7 @@ export async function openAtelier(opts: {
   const session = getFloorSession();
   if (session) {
     const existing = await studioFromFloor();
-    if (existing.atelier && existing.atelier.id !== 0) return { slug: existing.atelier.slug };
+    if (existing.atelier) return { slug: existing.atelier.slug };
     const atelier = savePreviewAtelier({
       ownerId: session.userId,
       name: opts.data.name,
@@ -103,24 +98,32 @@ export async function listPiece(opts: {
     category: string;
     price: number;
     sizes: string[];
-    imageUrl: string;
+    imageUrl?: string;
+    imageUrls?: string[];
     leadTime: string;
   };
 }) {
   const session = getFloorSession();
+  const imageUrls = (opts.data.imageUrls?.length
+    ? opts.data.imageUrls
+    : opts.data.imageUrl
+      ? [opts.data.imageUrl]
+      : []
+  ).filter(Boolean);
   if (session) {
     const studio = await studioFromFloor();
     if (!studio.atelier) throw new Error("Open an atelier first.");
-    if (!opts.data.imageUrl) throw new Error("Add a photograph of the piece.");
+    if (!imageUrls.length) throw new Error("Add a photograph of the piece.");
     const piece = buildPreviewPiece({
       ...opts.data,
+      imageUrls,
       designer: {
         id: studio.atelier.id,
         slug: studio.atelier.slug,
         name: studio.atelier.name,
         city: studio.atelier.city,
         country: studio.atelier.country,
-        imageUrl: studio.atelier.imageUrl || opts.data.imageUrl,
+        imageUrl: studio.atelier.imageUrl || imageUrls[0],
         userId: session.profileId || session.userId,
       },
       listedBy: session.profileId || session.userId,

@@ -1,16 +1,18 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, MapPin } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { MapPin } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { HouseRoom, RolePill, RoomEmpty, RoomSkeleton, RoomStat } from "@/components/house-room";
 import { LazyImage } from "@/components/lazy-image";
 import { ProductGrid } from "@/components/product-card";
+import { ShowroomShareCard } from "@/components/showroom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RedirectToSignIn } from "@/lib/auth/gates";
+import { ATELIER_BIO_MAX } from "@/lib/constants";
 import { houseError } from "@/lib/errors";
 import { claimRole } from "@/lib/roles";
 import { getMyStudio, openAtelier } from "@/lib/studio";
@@ -34,6 +36,15 @@ function Studio() {
     bio: "",
   });
   const [busy, setBusy] = useState(false);
+  const prefilled = useRef(false);
+
+  useEffect(() => {
+    if (prefilled.current) return;
+    const name = user?.displayName?.trim();
+    if (!name) return;
+    prefilled.current = true;
+    setForm((prev) => (prev.name ? prev : { ...prev, name }));
+  }, [user?.displayName]);
 
   if (isPending || (user && studio.isPending)) return <RoomSkeleton />;
   if (!user) return <RedirectToSignIn />;
@@ -50,7 +61,7 @@ function Studio() {
     try {
       await openAtelier({ data: form });
       await claimRole({ data: { role: "designer" } });
-      toast.success("Your atelier is open");
+      toast.success("Your showroom is open. Copy the link for your clients.");
       await client.invalidateQueries({ queryKey: ["studio"] });
       await client.invalidateQueries({ queryKey: ["designers"] });
       await client.invalidateQueries({ queryKey: ["house-role"] });
@@ -117,15 +128,19 @@ function Studio() {
                 </div>
               </div>
               <div>
-                <Label htmlFor="bio">House note</Label>
+                <Label htmlFor="bio">Short bio</Label>
                 <Textarea
                   id="bio"
                   className="mt-2"
                   required
+                  maxLength={ATELIER_BIO_MAX}
                   value={form.bio}
-                  onChange={(e) => setForm({ ...form, bio: e.target.value })}
+                  onChange={(e) => setForm({ ...form, bio: e.target.value.slice(0, ATELIER_BIO_MAX) })}
                   placeholder="What do you make, and from where?"
                 />
+                <p className="mt-1 text-xs tabular-nums text-charcoal-400">
+                  {form.bio.length} / {ATELIER_BIO_MAX}
+                </p>
               </div>
               <Button type="submit" disabled={busy}>
                 {busy ? "Opening…" : "Open atelier"}
@@ -158,12 +173,6 @@ function Studio() {
           )}
           <Button asChild variant="outline">
             <Link to="/desk">Collector notes</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link to="/s/$slug" params={{ slug: atelier.slug }}>
-              Open showroom
-              <ArrowUpRight size={14} />
-            </Link>
           </Button>
           <Button asChild>
             <Link to="/studio/new">List a piece</Link>
@@ -200,6 +209,9 @@ function Studio() {
             <RoomStat label="On the floor" value={pieces.length} />
             <RoomStat label="City" value={atelier.city} />
             <RoomStat label="Door" value={isDesigner ? "Atelier" : "Guest"} />
+          </div>
+          <div className="mt-8">
+            <ShowroomShareCard slug={atelier.slug} name={atelier.name} />
           </div>
         </div>
       </section>

@@ -43,18 +43,24 @@ function outputMime(): string {
   return canvas.toDataURL("image/webp").startsWith("data:image/webp") ? "image/webp" : "image/jpeg";
 }
 
-export async function compressImage(file: File): Promise<CompressionResult> {
+/** Shrink the file for storage. Display still uses the 1440px master, so it looks sharp. */
+export async function compressImage(
+  file: File,
+  opts?: { maxBytes?: number; maxEdge?: number },
+): Promise<CompressionResult> {
   const originalSize = file.size;
   const mimeType = outputMime();
   const img = await blobToImage(file);
   const originalWidth = img.naturalWidth || img.width;
   const originalHeight = img.naturalHeight || img.height;
+  const maxEdge = opts?.maxEdge ?? MAX_EDGE;
+  const targetBytes = opts?.maxBytes ?? TARGET_BYTES;
 
   let width = originalWidth;
   let height = originalHeight;
   const long = Math.max(width, height);
-  if (long > MAX_EDGE) {
-    const scale = MAX_EDGE / long;
+  if (long > maxEdge) {
+    const scale = maxEdge / long;
     width = Math.round(width * scale);
     height = Math.round(height * scale);
   }
@@ -72,7 +78,7 @@ export async function compressImage(file: File): Promise<CompressionResult> {
 
   let quality = START_QUALITY;
   let blob = await canvasToBlob(canvas, mimeType, quality);
-  while (blob.size > TARGET_BYTES && quality > MIN_QUALITY) {
+  while (blob.size > targetBytes && quality > MIN_QUALITY) {
     quality = Math.max(MIN_QUALITY, Math.round((quality - 0.08) * 100) / 100);
     blob = await canvasToBlob(canvas, mimeType, quality);
   }
@@ -107,12 +113,21 @@ function withQuery(url: string, params: Record<string, string>) {
   return `${url}${joiner}${qs}`;
 }
 
+/**
+ * Display URL: request a sharp render from the origin.
+ * Stored files are already compressed; this asks the CDN to serve the right width
+ * so the picture still looks like the original on a retina screen.
+ */
 export function displayImage(url: string, width: ImageWidth = 900, quality = 82): string {
   if (!url || url.startsWith("data:") || url.startsWith("blob:")) return url;
 
   if (url.includes("supabase.co/storage/v1/object/public/")) {
     const rendered = url.replace("/storage/v1/object/public/", "/storage/v1/render/image/public/");
-    return withQuery(rendered, { width: String(width), quality: String(quality), resize: "contain" });
+    return withQuery(rendered, {
+      width: String(width),
+      quality: String(quality),
+      resize: "contain",
+    });
   }
 
   if (url.includes("supabase.co/storage")) {

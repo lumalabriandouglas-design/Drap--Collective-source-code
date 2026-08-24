@@ -59,15 +59,20 @@ export async function listRelated(opts: {
 }
 
 export async function listDesigners() {
+  const fromFloor = designersOf(await liveFloor());
   if (import.meta.env.DEV || import.meta.env.SSR) {
     try {
       const { listDesignersRpc } = await import("@/lib/catalog-rpc");
-      return await listDesignersRpc();
+      const rows = await listDesignersRpc();
+      if (rows.length) {
+        const extra = fromFloor.filter((d) => !rows.some((row) => row.slug === d.slug));
+        return [...extra, ...rows];
+      }
     } catch {
       /* live floor */
     }
   }
-  return designersOf(await liveFloor());
+  return fromFloor;
 }
 
 export async function getDesigner(opts: { data: string }) {

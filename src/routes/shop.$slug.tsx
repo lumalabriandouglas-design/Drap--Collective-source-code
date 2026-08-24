@@ -156,7 +156,7 @@ function ProductPage() {
             <div className="mt-3 flex gap-2">
               {images.map((src, i) => (
                 <button
-                  key={src}
+                  key={i}
                   type="button"
                   onClick={() => setActive(i)}
                   className={`h-20 w-16 overflow-hidden rounded-lg border ${

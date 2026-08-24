@@ -18,7 +18,18 @@ export const PRODUCT_CATEGORIES = [
 
 export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
 
-export const PRODUCT_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "One Size"] as const;
+export const PRODUCT_SIZES = [
+  "XS",
+  "S",
+  "M",
+  "L",
+  "XL",
+  "XXL",
+  "One Size",
+] as const;
+
+export const MAX_PHOTOS_PER_PIECE = 5;
+export const ATELIER_BIO_MAX = 280;
 
 export const STUDIO_COVERS = [
   { id: "studio-1", url: "/images/products/studio-1.jpg", label: "Atelier rail" },

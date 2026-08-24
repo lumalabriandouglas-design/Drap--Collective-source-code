@@ -50,7 +50,7 @@ function Join() {
     setHint(null);
     try {
       const session = await floorSignUp({ email, password, name, door });
-      toast.success(door === "designer" ? "Your atelier door is open" : "Welcome to the house");
+      toast.success(door === "designer" ? "Now open your atelier — that is the door you send to clients" : "Welcome to the house");
       const dest = pathForRole(session.role as FloorRole);
       if (dest === "/studio") await navigate({ to: "/studio" });
       else await navigate({ to: "/account" });

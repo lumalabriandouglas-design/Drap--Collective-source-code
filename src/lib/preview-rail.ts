@@ -1,3 +1,4 @@
+import { MAX_PHOTOS_PER_PIECE } from "@/lib/constants";
 import type { AtelierProfile, Designer, Product } from "@/lib/types";
 import type { Floor } from "@/lib/live-floor";
 
@@ -97,12 +98,16 @@ export function buildPreviewPiece(input: {
   category: string;
   price: number;
   sizes: string[];
-  imageUrl: string;
+  imageUrl?: string;
+  imageUrls?: string[];
   leadTime: string;
   designer: Pick<Designer, "id" | "slug" | "name" | "city" | "country" | "imageUrl" | "userId">;
   listedBy: string;
 }): Product {
   const stamp = Date.now();
+  const imageUrls = (input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [])
+    .filter(Boolean)
+    .slice(0, MAX_PHOTOS_PER_PIECE);
   return {
     id: 900_000_000 + (stamp % 1_000_000),
     slug: slugify(input.name, `preview-${stamp.toString(36)}`),
@@ -112,7 +117,7 @@ export function buildPreviewPiece(input: {
     priceCents: Math.max(0, Math.round(input.price)),
     materials: [],
     sizes: input.sizes.length ? input.sizes : ["M"],
-    imageUrls: [input.imageUrl],
+    imageUrls,
     tags: ["preview", input.category.toLowerCase()],
     leadTime: input.leadTime.trim() || "Made to order · inquire",
     featured: false,
@@ -123,16 +128,14 @@ export function buildPreviewPiece(input: {
 
 export function mergePreviewRail(floor: Floor): Floor {
   const store = read();
-  if (!store.pieces.length && !store.ateliers.length) return floor;
+  if (!store.pieces.length && !Object.keys(store.ateliers).length) return floor;
   const products = [
     ...store.pieces.filter((piece) => !floor.products.some((row) => row.slug === piece.slug)),
     ...floor.products,
   ];
   const designers = [...floor.designers];
-  for (const atelier of Object.values(store.ateliers)) {
-    if (designers.some((d) => d.slug === atelier.slug || d.name.toLowerCase() === atelier.name.toLowerCase())) {
-      continue;
-    }
+  for (const [ownerId, atelier] of Object.entries(store.ateliers)) {
+    if (designers.some((d) => d.slug === atelier.slug)) continue;
     designers.push({
       id: atelier.id,
       slug: atelier.slug,
@@ -141,10 +144,10 @@ export function mergePreviewRail(floor: Floor): Floor {
       country: atelier.country,
       bio: atelier.bio,
       philosophy: null,
-      imageUrl: atelier.imageUrl || store.pieces[0]?.imageUrls[0] || "/images/products/studio-2.jpg",
+      imageUrl: atelier.imageUrl || store.pieces.find((p) => p.designer.slug === atelier.slug)?.imageUrls[0] || "/images/products/studio-2.jpg",
       featured: false,
-      userId: null,
-      pieceCount: store.pieces.filter((p) => p.designer.slug === atelier.slug).length,
+      userId: ownerId,
+      pieceCount: products.filter((p) => p.designer.slug === atelier.slug).length,
     });
   }
   return {

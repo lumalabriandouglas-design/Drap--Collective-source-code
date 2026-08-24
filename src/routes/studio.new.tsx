@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { HouseRoom, RoomSkeleton } from "@/components/house-room";
@@ -9,9 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { houseError } from "@/lib/errors";
-import { PRODUCT_CATEGORIES, PRODUCT_SIZES } from "@/lib/constants";
+import { MAX_PHOTOS_PER_PIECE, PRODUCT_CATEGORIES, PRODUCT_SIZES } from "@/lib/constants";
 import { compressImage, formatBytes } from "@/lib/media";
-import { listPiece, storageStatus, uploadPiecePhoto } from "@/lib/studio";
+import { listPiece, getMyStudio, storageStatus, uploadPiecePhoto } from "@/lib/studio";
 import { useHouseRole } from "@/lib/use-role";
 
 export const Route = createFileRoute("/studio/new")({ component: NewPiece });
@@ -21,6 +22,11 @@ function NewPiece() {
   const navigate = useNavigate();
   const client = useQueryClient();
   const storage = useQuery({ queryKey: ["storage"], queryFn: () => storageStatus() });
+  const studio = useQuery({
+    queryKey: ["studio"],
+    enabled: Boolean(user),
+    queryFn: () => getMyStudio(),
+  });
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -29,15 +35,15 @@ function NewPiece() {
     category: "Ready-to-Wear",
     price: "150000",
     leadTime: "Made to order · inquire",
-    imageUrl: "",
+    imageUrls: [] as string[],
     sizes: ["S", "M", "L"] as string[],
   });
 
-  if (isPending) return <RoomSkeleton cards={2} />;
+  if (isPending || (user && studio.isPending)) return <RoomSkeleton cards={2} />;
   if (!user) return <RedirectToSignIn />;
-  if (!isDesigner) {
+  if (!isDesigner || !studio.data?.atelier) {
     return (
-      <HouseRoom eyebrow="Studio" title="Open an atelier first" lede="Listing is for designers already on the floor.">
+      <HouseRoom eyebrow="Studio" title="Open an atelier first" lede="Your showroom is the door you send to clients. Open it, then list.">
         <Button asChild>
           <Link to="/studio">Designer studio</Link>
         </Button>
@@ -54,24 +60,35 @@ function NewPiece() {
     }));
   }
 
-  async function onFile(file: File | undefined) {
-    if (!file) return;
+  function removePhoto(index: number) {
+    setForm((prev) => ({ ...prev, imageUrls: prev.imageUrls.filter((_, i) => i !== index) }));
+  }
+
+  async function onFiles(list: FileList | null) {
+    const files = list ? Array.from(list) : [];
+    if (!files.length) return;
+    const remaining = MAX_PHOTOS_PER_PIECE - form.imageUrls.length;
+    if (remaining <= 0) {
+      toast("Five photographs is the limit for one piece");
+      return;
+    }
+    const batch = files.slice(0, remaining);
     try {
-      setNote("Compressing for the floor…");
-      const result = await compressImage(file);
-      setNote(
-        `Stored ${formatBytes(result.compressedSize)} from ${formatBytes(result.originalSize)} · ${result.width}×${result.height}`,
-      );
-      const uploaded = await uploadPiecePhoto({
-        data: {
-          filename: result.file.name,
-          mime: result.mimeType,
-          data: result.dataUrl,
-        },
-      });
-      setForm((prev) => ({ ...prev, imageUrl: uploaded.url }));
-      if (uploaded.backend === "r2") {
-        setNote((prev) => `${prev ?? "Photo ready"} · Cloudflare`);
+      for (const file of batch) {
+        setNote("Compressing for the floor…");
+        const result = await compressImage(file, { maxBytes: 280 * 1024, maxEdge: 1200 });
+        const uploaded = await uploadPiecePhoto({
+          data: {
+            filename: result.file.name,
+            mime: result.mimeType,
+            data: result.dataUrl,
+          },
+        });
+        setForm((prev) => {
+          if (prev.imageUrls.length >= MAX_PHOTOS_PER_PIECE) return prev;
+          return { ...prev, imageUrls: [...prev.imageUrls, uploaded.url] };
+        });
+        setNote(`Stored ${formatBytes(result.compressedSize)} · ${result.width}×${result.height}`);
       }
     } catch (err) {
       toast.error(houseError(err));
@@ -81,7 +98,7 @@ function NewPiece() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.imageUrl) {
+    if (!form.imageUrls.length) {
       toast("Add a photograph of the piece");
       return;
     }
@@ -94,7 +111,7 @@ function NewPiece() {
           category: form.category,
           price: Number(form.price),
           sizes: form.sizes,
-          imageUrl: form.imageUrl,
+          imageUrls: form.imageUrls,
           leadTime: form.leadTime,
         },
       });
@@ -102,6 +119,7 @@ function NewPiece() {
       await client.invalidateQueries({ queryKey: ["studio"] });
       await client.invalidateQueries({ queryKey: ["products"] });
       await client.invalidateQueries({ queryKey: ["designers"] });
+      await client.invalidateQueries({ queryKey: ["designer"] });
       void navigate({ to: "/shop/$slug", params: { slug: result.slug } });
     } catch (err) {
       toast.error(houseError(err));
@@ -110,14 +128,16 @@ function NewPiece() {
     }
   }
 
+  const slotsLeft = MAX_PHOTOS_PER_PIECE - form.imageUrls.length;
+
   return (
     <HouseRoom
       eyebrow="Studio"
       title="List a piece"
       lede={
         storage.data?.r2
-          ? "Photographs go to Cloudflare. The showroom keeps the cloth at full visual quality."
-          : "The photograph stays in this preview. Existing live pieces are not overwritten — this listing is only on the preview rail until the house opens it on the floor."
+          ? "Up to five photographs. The showroom keeps the cloth at full visual quality."
+          : "Up to five photographs. They stay on this preview — existing live pieces are not overwritten."
       }
       actions={
         <Button asChild variant="outline">
@@ -127,23 +147,51 @@ function NewPiece() {
     >
       <form onSubmit={(e) => void onSubmit(e)} className="grid max-w-2xl gap-5">
         <div>
-          <Label htmlFor="photo">Photograph</Label>
+          <Label htmlFor="photo">Photographs</Label>
           <p className="mt-1 text-xs text-charcoal-400">
-            We shrink the file for storage. The showroom still displays it at full visual quality.
+            Up to {MAX_PHOTOS_PER_PIECE}. The first is the cover. We shrink the files so phones stay light.
           </p>
-          <Input
-            id="photo"
-            className="mt-2"
-            type="file"
-            accept="image/*"
-            onChange={(e) => void onFile(e.target.files?.[0])}
-          />
-          {note && <p className="mt-2 text-xs text-charcoal-500">{note}</p>}
-          {form.imageUrl && (
-            <div className="mt-3 overflow-hidden rounded-xl bg-ivory-100">
-              <img src={form.imageUrl} alt="Cover preview" className="aspect-portrait w-full object-cover" />
-            </div>
+          {form.imageUrls.length > 0 && (
+            <ul className="mt-3 grid grid-cols-5 gap-2">
+              {form.imageUrls.map((src, i) => (
+                <li key={i} className="relative">
+                  <div className="aspect-[3/4] overflow-hidden rounded-xl bg-ivory-100">
+                    <img src={src} alt="" className="size-full object-cover" />
+                  </div>
+                  {i === 0 && (
+                    <span className="absolute bottom-1 left-1 rounded-full bg-charcoal-800 px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-ivory-50">
+                      Cover
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    aria-label="Remove photograph"
+                    className="absolute top-1 right-1 grid size-8 place-items-center rounded-full bg-charcoal-800/80 text-ivory-50"
+                    onClick={() => removePhoto(i)}
+                  >
+                    <X size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
+          {slotsLeft > 0 && (
+            <Input
+              id="photo"
+              className="mt-3"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => {
+                void onFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+          )}
+          {note && <p className="mt-2 text-xs text-charcoal-500">{note}</p>}
+          <p className="mt-1 text-xs tabular-nums text-charcoal-400">
+            {form.imageUrls.length} / {MAX_PHOTOS_PER_PIECE}
+          </p>
         </div>
         <div>
           <Label htmlFor="name">Name</Label>
@@ -170,7 +218,7 @@ function NewPiece() {
             <Label htmlFor="cat">Category</Label>
             <select
               id="cat"
-              className="mt-2 h-11 w-full rounded-lg border border-border bg-ivory-50 px-3 text-sm"
+              className="mt-2 h-11 w-full rounded-lg border border-charcoal-200 bg-ivory-50 px-3 text-sm"
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
             >
@@ -203,19 +251,17 @@ function NewPiece() {
           />
         </div>
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-gold-600">
-            Sizes
-          </p>
+          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-gold-600">Sizes</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {PRODUCT_SIZES.map((size) => (
               <button
                 key={size}
                 type="button"
                 onClick={() => toggleSize(size)}
-                className={`h-10 rounded-full px-4 text-xs ${
+                className={`h-11 rounded-full px-4 text-xs ${
                   form.sizes.includes(size)
                     ? "bg-charcoal-800 text-ivory-50"
-                    : "border border-border text-charcoal-600"
+                    : "border border-charcoal-200 text-charcoal-600"
                 }`}
               >
                 {size}
