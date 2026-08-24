@@ -103,6 +103,37 @@ async function putPreview(key: string, body: Buffer) {
   return `/images/uploads/${filename}`;
 }
 
+export async function signR2Put(input: {
+  filename: string;
+  mime: string;
+  folder: string;
+}): Promise<{ uploadUrl: string; publicUrl: string; mime: string; key: string } | null> {
+  const cfg = readConfig();
+  if (!cfg) return null;
+  const mime = input.mime === "image/jpeg" ? "image/jpeg" : "image/webp";
+  const key = `${input.folder}/${Date.now()}-${safeName(input.filename)}`;
+  const client = new AwsClient({
+    accessKeyId: cfg.accessKeyId,
+    secretAccessKey: cfg.secretAccessKey,
+    service: "s3",
+    region: "auto",
+  });
+  const endpoint = `https://${cfg.accountId}.r2.cloudflarestorage.com/${cfg.bucket}/${key}`;
+  const signed = await client.sign(
+    new Request(endpoint, {
+      method: "PUT",
+      headers: { "Content-Type": mime },
+    }),
+    { aws: { signQuery: true } },
+  );
+  return {
+    uploadUrl: signed.url,
+    publicUrl: `${cfg.publicBase}/${key}`,
+    mime,
+    key,
+  };
+}
+
 export async function storeImage(input: {
   filename: string;
   mime: string;
