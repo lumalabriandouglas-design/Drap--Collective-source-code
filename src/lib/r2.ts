@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AwsClient } from "aws4fetch";
 
+/** Public Cloudflare house — not secrets. Keys stay in env on publish. */
 const HOUSE = {
   accountId: "558dca581274b42590d6dfd88a9a1e24",
   bucket: "odrapecollective",
@@ -60,7 +61,14 @@ export function r2Status(): R2Status {
     missing.push("R2_SECRET_ACCESS_KEY");
   }
   if (!publicUrl) missing.push("R2_PUBLIC_BASE");
-  return { r2: Boolean(readConfig()), account, bucket, keys, publicUrl, missing };
+  return {
+    r2: Boolean(readConfig()),
+    account,
+    bucket,
+    keys,
+    publicUrl,
+    missing,
+  };
 }
 
 export function r2Ready() {
@@ -72,15 +80,18 @@ function safeName(filename: string) {
   return base.slice(0, 80) || "piece.webp";
 }
 
-async function putR2(cfg: R2Config, key: string, body: Buffer, mime: string) {
-  const client = new AwsClient({
+function clientFor(cfg: R2Config) {
+  return new AwsClient({
     accessKeyId: cfg.accessKeyId,
     secretAccessKey: cfg.secretAccessKey,
     service: "s3",
     region: "auto",
   });
+}
+
+async function putR2(cfg: R2Config, key: string, body: Buffer, mime: string) {
   const endpoint = `https://${cfg.accountId}.r2.cloudflarestorage.com/${cfg.bucket}/${key}`;
-  const response = await client.fetch(endpoint, {
+  const response = await clientFor(cfg).fetch(endpoint, {
     method: "PUT",
     headers: {
       "Content-Type": mime,
@@ -112,14 +123,8 @@ export async function signR2Put(input: {
   if (!cfg) return null;
   const mime = input.mime === "image/jpeg" ? "image/jpeg" : "image/webp";
   const key = `${input.folder}/${Date.now()}-${safeName(input.filename)}`;
-  const client = new AwsClient({
-    accessKeyId: cfg.accessKeyId,
-    secretAccessKey: cfg.secretAccessKey,
-    service: "s3",
-    region: "auto",
-  });
   const endpoint = `https://${cfg.accountId}.r2.cloudflarestorage.com/${cfg.bucket}/${key}`;
-  const signed = await client.sign(
+  const signed = await clientFor(cfg).sign(
     new Request(endpoint, {
       method: "PUT",
       headers: { "Content-Type": mime },

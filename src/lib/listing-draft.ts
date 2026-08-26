@@ -18,32 +18,18 @@ export function readListingDraft(): ListingDraft | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ListingDraft;
     if (!parsed || typeof parsed !== "object") return null;
-    return {
-      name: String(parsed.name ?? ""),
-      description: String(parsed.description ?? ""),
-      category: String(parsed.category ?? "Ready-to-Wear"),
-      price: String(parsed.price ?? "150000"),
-      leadTime: String(parsed.leadTime ?? ""),
-      imageUrls: Array.isArray(parsed.imageUrls) ? parsed.imageUrls.filter(Boolean) : [],
-      sizes: Array.isArray(parsed.sizes) ? parsed.sizes.map(String) : ["S", "M", "L"],
-      savedAt: Number(parsed.savedAt) || Date.now(),
-    };
+    return parsed;
   } catch {
     return null;
   }
 }
 
-export function writeListingDraft(draft: Omit<ListingDraft, "savedAt">) {
+export function saveListingDraft(draft: Omit<ListingDraft, "savedAt">) {
   if (typeof window === "undefined") return;
-  const payload: ListingDraft = { ...draft, savedAt: Date.now() };
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(payload));
+    window.localStorage.setItem(KEY, JSON.stringify({ ...draft, savedAt: Date.now() }));
   } catch {
-    try {
-      window.localStorage.setItem(KEY, JSON.stringify({ ...payload, imageUrls: [] }));
-    } catch {
-      /* quota */
-    }
+    /* quota */
   }
 }
 
@@ -56,6 +42,11 @@ export function clearListingDraft() {
   }
 }
 
-export function draftIsEmpty(draft: ListingDraft) {
-  return !draft.name.trim() && !draft.description.trim() && draft.imageUrls.length === 0;
+export function draftIsUseful(draft: ListingDraft | null) {
+  if (!draft) return false;
+  return Boolean(
+    draft.name.trim() ||
+      draft.description.trim() ||
+      draft.imageUrls.length,
+  );
 }

@@ -6,12 +6,14 @@ import {
   Scripts,
   useRouterState,
 } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Toaster } from "sonner";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { AuthProvider } from "@/lib/auth/provider";
 import { staticFloor } from "@/lib/house-mode";
+import { bootTheme } from "@/lib/theme";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Drapé Collective";
@@ -39,8 +41,7 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       {
-        rel: "preconnect",
-        href: "https://fonts.gstatic.com",
+        rel: "preconnect", href: "https://fonts.gstatic.com",
         crossOrigin: "anonymous",
       },
       {
@@ -56,7 +57,11 @@ export const Route = createRootRoute({
 
 function RootDocument() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const bare = pathname === "/login" || pathname === "/welcome";
+  const bare = pathname === "/login" || pathname === "/welcome" || pathname === "/join";
+
+  useEffect(() => {
+    bootTheme();
+  }, []);
 
   const inner = (
     <>
