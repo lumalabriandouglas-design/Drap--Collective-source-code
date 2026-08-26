@@ -87,7 +87,10 @@
     letter-spacing: 0.01em;
   }
 
-  h1, h2, h3, h4 {
+  h1,
+  h2,
+  h3,
+  h4 {
     font-family: var(--font-serif);
     font-weight: 500;
     letter-spacing: -0.02em;
@@ -95,7 +98,9 @@
     text-wrap: balance;
   }
 
-  p { text-wrap: pretty; }
+  p {
+    text-wrap: pretty;
+  }
 
   button:not(:disabled),
   [role="button"]:not(:disabled) {
@@ -113,13 +118,97 @@
   }
 }
 
+html[data-theme="charcoal"] {
+  --color-background: oklch(8.5% 0.01 14);
+  --color-foreground: oklch(96% 0.006 55);
+  --color-card: oklch(12% 0.012 14);
+  --color-card-foreground: oklch(96% 0.006 55);
+  --color-popover: oklch(12% 0.012 14);
+  --color-popover-foreground: oklch(96% 0.006 55);
+  --color-primary: oklch(96% 0.006 55);
+  --color-primary-foreground: oklch(10% 0.01 14);
+  --color-secondary: oklch(16% 0.012 16);
+  --color-secondary-foreground: oklch(96% 0.006 55);
+  --color-muted: oklch(16% 0.012 16);
+  --color-muted-foreground: oklch(72% 0.012 50);
+  --color-border: oklch(24% 0.012 18);
+  --color-input: oklch(24% 0.012 18);
+  color-scheme: dark;
+}
+
+html[data-theme="charcoal"] body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+html[data-theme="charcoal"] .bg-ivory-50,
+html[data-theme="charcoal"] .bg-ivory-50\/95 {
+  background-color: oklch(12% 0.012 14);
+}
+
+html[data-theme="charcoal"] .bg-ivory-100,
+html[data-theme="charcoal"] .bg-ivory-200 {
+  background-color: oklch(16% 0.014 16);
+}
+
+html[data-theme="charcoal"] .bg-white {
+  background-color: oklch(14% 0.012 14);
+}
+
+html[data-theme="charcoal"] :is(
+  .text-charcoal-800,
+  .text-charcoal-900,
+  .hover\:text-charcoal-800:hover,
+  .hover\:text-charcoal-700:hover,
+  .group-hover\:text-charcoal-800,
+  .group-hover\:text-charcoal-600
+) {
+  color: oklch(96% 0.005 55);
+}
+
+html[data-theme="charcoal"] .text-charcoal-700 {
+  color: oklch(90% 0.008 54);
+}
+
+html[data-theme="charcoal"] .text-charcoal-600 {
+  color: oklch(82% 0.01 50);
+}
+
+html[data-theme="charcoal"] :is(.text-charcoal-500, .hover\:text-charcoal-500:hover) {
+  color: oklch(72% 0.012 48);
+}
+
+html[data-theme="charcoal"] .text-charcoal-400 {
+  color: oklch(64% 0.012 46);
+}
+
+html[data-theme="charcoal"] .text-charcoal-300 {
+  color: oklch(55% 0.012 40);
+}
+
+html[data-theme="charcoal"] :is(.border-charcoal-100, .border-charcoal-100\/80, .border-charcoal-200) {
+  border-color: oklch(26% 0.012 18);
+}
+
+html[data-theme="charcoal"] .bg-charcoal-800 {
+  background-color: oklch(94% 0.006 55);
+  color: oklch(10% 0.01 14);
+}
+
+html[data-theme="charcoal"] .bg-charcoal-800.text-ivory-50,
+html[data-theme="charcoal"] .hover\:bg-charcoal-800:hover {
+  color: oklch(10% 0.01 14);
+}
+
 .gold-line {
   width: 2.5rem;
   height: 1px;
   background: var(--color-gold-400);
 }
 
-.font-serif { font-family: var(--font-serif); }
+.font-serif {
+  font-family: var(--font-serif);
+}
 
 .img-cover {
   width: 100%;
@@ -128,18 +217,32 @@
 }
 
 @keyframes kenburns {
-  from { transform: scale(1); }
-  to { transform: scale(1.06); }
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.06);
+  }
 }
 
-.hero-kenburns { animation: kenburns 7s ease-out forwards; }
+.hero-kenburns {
+  animation: kenburns 7s ease-out forwards;
+}
 
 @keyframes drape-rise {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.rise-in { animation: drape-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.rise-in {
+  animation: drape-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
 
 .hero-progress {
   width: 100%;
@@ -148,8 +251,12 @@
 }
 
 @keyframes hero-progress {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 
 .drape {
@@ -192,15 +299,27 @@
   transform-origin: right center;
 }
 
-.drape-open-left { transform: translateX(-102%); }
-.drape-open-right { transform: translateX(102%); }
+.drape-open-left {
+  transform: translateX(-102%);
+}
+
+.drape-open-right {
+  transform: translateX(102%);
+}
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  .rise-in, .hero-kenburns, .hero-progress { animation: none; }
+
+  .rise-in,
+  .hero-kenburns,
+  .hero-progress {
+    animation: none;
+  }
 }
