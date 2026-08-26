@@ -12,7 +12,7 @@ import { listPreviewPieces } from "@/lib/preview-rail";
 
 export async function listProducts(opts: { data?: ProductFilter } = {}) {
   const data = opts.data ?? {};
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
     try {
       const { listProductsRpc } = await import("@/lib/catalog-rpc");
       const rows = await listProductsRpc({ data });
@@ -28,7 +28,7 @@ export async function listProducts(opts: { data?: ProductFilter } = {}) {
 }
 
 export async function getProduct(opts: { data: string }) {
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
     try {
       const { getProductRpc } = await import("@/lib/catalog-rpc");
       const found = await getProductRpc({ data: opts.data });
@@ -47,7 +47,7 @@ export async function getProduct(opts: { data: string }) {
 export async function listRelated(opts: {
   data: { slug: string; category: string; designerSlug: string };
 }) {
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
     try {
       const { listRelatedRpc } = await import("@/lib/catalog-rpc");
       return await listRelatedRpc({ data: opts.data });
@@ -60,7 +60,7 @@ export async function listRelated(opts: {
 
 export async function listDesigners() {
   const fromFloor = designersOf(await liveFloor());
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
     try {
       const { listDesignersRpc } = await import("@/lib/catalog-rpc");
       const rows = await listDesignersRpc();
@@ -76,7 +76,7 @@ export async function listDesigners() {
 }
 
 export async function getDesigner(opts: { data: string }) {
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
     try {
       const { getDesignerRpc } = await import("@/lib/catalog-rpc");
       const found = await getDesignerRpc({ data: opts.data });
@@ -89,7 +89,7 @@ export async function getDesigner(opts: { data: string }) {
 }
 
 export async function listLookbooks() {
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
     try {
       const { listLookbooksRpc } = await import("@/lib/catalog-rpc");
       return await listLookbooksRpc();
@@ -101,7 +101,7 @@ export async function listLookbooks() {
 }
 
 export async function getLookbook(opts: { data: string }) {
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
     try {
       const { getLookbookRpc } = await import("@/lib/catalog-rpc");
       const found = await getLookbookRpc({ data: opts.data });
@@ -114,7 +114,7 @@ export async function getLookbook(opts: { data: string }) {
 }
 
 export async function recommendProducts(opts: { data: string[] }) {
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
     try {
       const { recommendProductsRpc } = await import("@/lib/catalog-rpc");
       return await recommendProductsRpc({ data: opts.data });

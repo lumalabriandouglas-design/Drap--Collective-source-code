@@ -32,7 +32,7 @@ function fromFloor(): HouseIdentity | null {
 }
 
 export async function checkExistingPassword(opts: { data: { email: string; password: string } }) {
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
     try {
       const { checkExistingPasswordRpc } = await import("@/lib/roles-rpc");
       return await checkExistingPasswordRpc({ data: opts.data });
@@ -63,7 +63,7 @@ export async function checkExistingPassword(opts: { data: { email: string; passw
 export async function getMyRole(): Promise<HouseIdentity> {
   const floor = fromFloor();
   if (floor) return floor;
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
     try {
       const { getMyRoleRpc } = await import("@/lib/roles-rpc");
       return await getMyRoleRpc();
@@ -83,7 +83,7 @@ export async function claimRole(opts: { data: { role: "client" | "designer" } })
     setFloorSession({ ...session, role: opts.data.role });
     return fromFloor() ?? GUEST;
   }
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
     const { claimRoleRpc } = await import("@/lib/roles-rpc");
     return await claimRoleRpc({ data: opts.data });
   }
@@ -97,7 +97,7 @@ export async function adminLedger() {
     const profiles = await fetchFloorProfiles();
     return { profiles, localUsers: 0, localOrders: 0 };
   }
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
     const { adminLedgerRpc } = await import("@/lib/roles-rpc");
     return await adminLedgerRpc();
   }
