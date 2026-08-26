@@ -43,6 +43,7 @@ function writeJson(key: string, value: unknown) {
 }
 
 function preferLocalLedger() {
+  if (import.meta.env.VITE_SPA === "true") return true;
   return Boolean(getFloorSession()) || !(import.meta.env.DEV || import.meta.env.SSR);
 }
 
@@ -131,7 +132,7 @@ function writeLocalOrder(data: CheckoutInput) {
 
 export async function placeOrder(opts: { data: CheckoutInput }) {
   if (getFloorSession()) return writeLocalOrder(opts.data);
-  if (import.meta.env.DEV || import.meta.env.SSR) {
+  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
     try {
       const { placeOrderRpc } = await import("@/lib/commerce-rpc");
       return await placeOrderRpc({ data: opts.data });
