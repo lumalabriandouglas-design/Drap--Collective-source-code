@@ -1,11 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { MapPin } from "lucide-react";
+import { Eye, EyeOff, MapPin, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { HouseRoom, RolePill, RoomEmpty, RoomSkeleton, RoomStat } from "@/components/house-room";
 import { LazyImage } from "@/components/lazy-image";
-import { ProductGrid } from "@/components/product-card";
 import { ShowroomShareCard } from "@/components/showroom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,9 +13,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { ATELIER_BIO_MAX } from "@/lib/constants";
 import { houseError } from "@/lib/errors";
+import { isHiddenPiece, isPreviewPiece } from "@/lib/preview-rail";
 import { claimRole } from "@/lib/roles";
-import { getMyStudio, openAtelier } from "@/lib/studio";
-import { isPreviewPiece } from "@/lib/preview-rail";
+import { deletePiece, getMyStudio, hidePiece, openAtelier, unhidePiece } from "@/lib/studio";
+import type { Product } from "@/lib/types";
 import { useHouseRole } from "@/lib/use-role";
 
 export const Route = createFileRoute("/studio/")({ component: Studio });
@@ -45,6 +45,12 @@ function Studio() {
     prefilled.current = true;
     setForm((prev) => (prev.name ? prev : { ...prev, name }));
   }, [user?.displayName]);
+
+  useEffect(() => {
+    const onRail = () => void client.invalidateQueries({ queryKey: ["studio"] });
+    window.addEventListener("drape-preview-rail", onRail);
+    return () => window.removeEventListener("drape-preview-rail", onRail);
+  }, [client]);
 
   if (isPending || (user && studio.isPending)) return <RoomSkeleton />;
   if (!user) return <RedirectToSignIn />;
@@ -220,13 +226,16 @@ function Studio() {
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">The rail</p>
-            <h2 className="mt-2 font-serif text-3xl text-charcoal-800">On the floor</h2>
+            <h2 className="mt-2 font-serif text-3xl text-charcoal-800">Your pieces</h2>
+            <p className="mt-2 max-w-xl text-sm font-light text-charcoal-500">
+              Hide, change photographs, or remove a listing. Live Kampala pieces stay on the floor until you hide them here.
+            </p>
           </div>
           <p className="text-xs tabular-nums text-charcoal-400">
             {livePieces.length} live · {previewPieces.length} preview
           </p>
         </div>
-        {livePieces.length === 0 && previewPieces.length === 0 ? (
+        {pieces.length === 0 ? (
           <RoomEmpty
             title="The rail is empty"
             body="Your atelier is open. List a piece when you are ready — it will sit on this preview until the house opens it on the live floor."
@@ -237,23 +246,119 @@ function Studio() {
             }
           />
         ) : (
-          <>
-            {livePieces.length > 0 ? <ProductGrid products={livePieces} showDesigner={false} /> : null}
-            {previewPieces.length > 0 ? (
-              <div className="mt-14">
-                <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">On this preview</p>
-                <h3 className="mt-2 font-serif text-2xl text-charcoal-800">Not yet on the live floor</h3>
-                <p className="mt-2 max-w-xl text-sm font-light text-charcoal-500">
-                  These pieces are only in this preview. The Kampala houses already listed stay as they are.
-                </p>
-                <div className="mt-8">
-                  <ProductGrid products={previewPieces} showDesigner={false} />
-                </div>
-              </div>
-            ) : null}
-          </>
+          <StudioRail pieces={pieces} />
         )}
       </section>
     </HouseRoom>
+  );
+}
+
+function StudioRail({ pieces }: { pieces: Product[] }) {
+  const client = useQueryClient();
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function refresh() {
+    await client.invalidateQueries({ queryKey: ["studio"] });
+    await client.invalidateQueries({ queryKey: ["products"] });
+    await client.invalidateQueries({ queryKey: ["designers"] });
+  }
+
+  async function onHide(piece: Product) {
+    setBusy(piece.slug);
+    try {
+      if (isHiddenPiece(piece)) {
+        await unhidePiece(piece.slug);
+        toast.success("Back on the floor");
+      } else {
+        await hidePiece(piece.slug);
+        toast.success("Hidden from collectors");
+      }
+      await refresh();
+    } catch (err) {
+      toast.error(houseError(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onDelete(piece: Product) {
+    if (!window.confirm(`Remove “${piece.name}” from this preview?`)) return;
+    setBusy(piece.slug);
+    try {
+      await deletePiece(piece.slug);
+      toast.success("Removed on this preview");
+      await refresh();
+    } catch (err) {
+      toast.error(houseError(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <ul className="grid gap-4">
+      {pieces.map((piece) => {
+        const hidden = isHiddenPiece(piece);
+        return (
+          <li
+            key={piece.slug}
+            className="grid gap-4 rounded-2xl border border-charcoal-100 bg-ivory-50 p-3 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:items-center sm:p-4"
+          >
+            <div className="aspect-[3/4] overflow-hidden rounded-xl bg-ivory-100 sm:aspect-auto sm:h-24">
+              <img src={piece.imageUrls[0]} alt="" className="size-full object-cover" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="truncate font-serif text-xl text-charcoal-800">{piece.name}</p>
+                {hidden ? (
+                  <span className="rounded-full bg-charcoal-800 px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-ivory-50">
+                    Hidden
+                  </span>
+                ) : isPreviewPiece(piece) ? (
+                  <span className="rounded-full border border-charcoal-200 px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-charcoal-500">
+                    Preview
+                  </span>
+                ) : (
+                  <span className="rounded-full border border-charcoal-200 px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-charcoal-500">
+                    Live
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-charcoal-500">
+                {piece.imageUrls.length} photo{piece.imageUrls.length === 1 ? "" : "s"} · {piece.category}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link to="/studio/new" search={{ edit: piece.slug }}>
+                  <Pencil size={14} />
+                  Edit
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy === piece.slug}
+                onClick={() => void onHide(piece)}
+              >
+                {hidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                {hidden ? "Show" : "Hide"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy === piece.slug}
+                onClick={() => void onDelete(piece)}
+              >
+                <Trash2 size={14} />
+                Remove
+              </Button>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
