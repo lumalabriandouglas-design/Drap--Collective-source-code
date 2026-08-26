@@ -49,12 +49,36 @@ function slugify(value: string, suffix: string) {
   return `${base || "piece"}-${suffix}`;
 }
 
+function withTag(tags: string[], tag: string) {
+  return tags.includes(tag) ? tags : [...tags, tag];
+}
+
+function withoutTag(tags: string[], tag: string) {
+  return tags.filter((row) => row !== tag);
+}
+
 export function isPreviewPiece(product: Product) {
   return product.tags.includes("preview") || product.slug.includes("-preview-");
 }
 
+export function isHiddenPiece(product: Product) {
+  return product.tags.includes("hidden");
+}
+
+export function isRemovedPiece(product: Product) {
+  return product.tags.includes("removed");
+}
+
+export function isPublicPiece(product: Product) {
+  return !isHiddenPiece(product) && !isRemovedPiece(product);
+}
+
 export function listPreviewPieces(): Product[] {
   return read().pieces;
+}
+
+export function getPreviewPiece(slug: string): Product | null {
+  return read().pieces.find((row) => row.slug === slug) ?? null;
 }
 
 export function getPreviewAtelier(ownerId: string | null | undefined): AtelierProfile | null {
@@ -92,6 +116,50 @@ export function addPreviewPiece(piece: Product) {
   write(store);
 }
 
+export function upsertPreviewPiece(piece: Product) {
+  addPreviewPiece(piece);
+}
+
+export function hidePreviewPiece(slug: string, base?: Product) {
+  const store = read();
+  const existing = store.pieces.find((row) => row.slug === slug) ?? base;
+  if (!existing) return;
+  const next: Product = {
+    ...existing,
+    tags: withTag(withoutTag(existing.tags, "removed"), "hidden"),
+  };
+  store.pieces = [next, ...store.pieces.filter((row) => row.slug !== slug)];
+  write(store);
+}
+
+export function showPreviewPiece(slug: string, base?: Product) {
+  const store = read();
+  const existing = store.pieces.find((row) => row.slug === slug) ?? base;
+  if (!existing) return;
+  const next: Product = {
+    ...existing,
+    tags: withoutTag(existing.tags, "hidden"),
+  };
+  store.pieces = [next, ...store.pieces.filter((row) => row.slug !== slug)];
+  write(store);
+}
+
+export function deletePreviewPiece(slug: string, base?: Product) {
+  const store = read();
+  const existing = store.pieces.find((row) => row.slug === slug) ?? base;
+  if (!existing) {
+    store.pieces = store.pieces.filter((row) => row.slug !== slug);
+    write(store);
+    return;
+  }
+  const next: Product = {
+    ...existing,
+    tags: withTag(withoutTag(existing.tags, "hidden"), "removed"),
+  };
+  store.pieces = [next, ...store.pieces.filter((row) => row.slug !== slug)];
+  write(store);
+}
+
 export function buildPreviewPiece(input: {
   name: string;
   description: string;
@@ -103,6 +171,7 @@ export function buildPreviewPiece(input: {
   leadTime: string;
   designer: Pick<Designer, "id" | "slug" | "name" | "city" | "country" | "imageUrl" | "userId">;
   listedBy: string;
+  slug?: string;
 }): Product {
   const stamp = Date.now();
   const imageUrls = (input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [])
@@ -110,7 +179,7 @@ export function buildPreviewPiece(input: {
     .slice(0, MAX_PHOTOS_PER_PIECE);
   return {
     id: 900_000_000 + (stamp % 1_000_000),
-    slug: slugify(input.name, `preview-${stamp.toString(36)}`),
+    slug: input.slug ?? slugify(input.name, `preview-${stamp.toString(36)}`),
     name: input.name.trim(),
     description: input.description.trim(),
     category: input.category,
@@ -128,11 +197,22 @@ export function buildPreviewPiece(input: {
 
 export function mergePreviewRail(floor: Floor): Floor {
   const store = read();
-  if (!store.pieces.length && !Object.keys(store.ateliers).length) return floor;
-  const products = [
-    ...store.pieces.filter((piece) => !floor.products.some((row) => row.slug === piece.slug)),
-    ...floor.products,
-  ];
+  if (!store.pieces.length && !Object.keys(store.ateliers).length) {
+    return {
+      ...floor,
+      products: floor.products.filter(isPublicPiece),
+    };
+  }
+  const bySlug = new Map<string, Product>();
+  for (const product of floor.products) bySlug.set(product.slug, product);
+  for (const piece of store.pieces) {
+    if (isRemovedPiece(piece)) {
+      bySlug.delete(piece.slug);
+      continue;
+    }
+    bySlug.set(piece.slug, piece);
+  }
+  const products = [...bySlug.values()].filter(isPublicPiece);
   const designers = [...floor.designers];
   for (const [ownerId, atelier] of Object.entries(store.ateliers)) {
     if (designers.some((d) => d.slug === atelier.slug)) continue;
