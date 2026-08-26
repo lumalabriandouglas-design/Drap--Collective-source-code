@@ -2,10 +2,10 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
+import { HouseDoor } from "@/components/house-door";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Wordmark } from "@/components/wordmark";
 import { authEnabled } from "@/lib/auth/auth-enabled";
 import { houseError } from "@/lib/errors";
 import { floorSignIn, setFloorSession, type FloorRole, type FloorSession } from "@/lib/floor-auth";
@@ -41,7 +41,7 @@ function Login() {
     const viaBrowser = async () => floorSignIn(userEmail, userPassword);
 
     try {
-      if (import.meta.env.DEV || import.meta.env.SSR) {
+      if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
         try {
           const { floorSignInRpc } = await import("@/lib/floor-auth-rpc");
           const session = await floorSignInRpc({ data: { email: userEmail, password: userPassword } });
@@ -87,23 +87,7 @@ function Login() {
 
   return (
     <main className="grid min-h-dvh lg:grid-cols-2">
-      <div className="relative hidden overflow-hidden bg-charcoal-900 lg:block">
-        <img
-          src="/images/hero-2.jpg"
-          alt=""
-          className="absolute inset-0 size-full object-cover opacity-80"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-          }}
-        />
-        <div className="absolute inset-0 bg-charcoal-900/40" />
-        <div className="relative flex h-full flex-col justify-end p-12">
-          <Wordmark light className="text-3xl" />
-          <p className="mt-4 max-w-sm font-serif text-2xl italic text-ivory-50">
-            Collectors and makers, same house — different rooms.
-          </p>
-        </div>
-      </div>
+      <HouseDoor line="Collectors and makers, same house — different rooms." />
       <div className="flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-sm">
           <h1 className="font-serif text-3xl text-charcoal-800">Welcome back</h1>

@@ -62,7 +62,7 @@ export function ProductGrid({
     >
       {products.map((product, index) => (
         <ProductCard
-          key={product.id}
+          key={`${product.slug}-${index}`}
           product={product}
           index={index}
           showDesigner={showDesigner}
