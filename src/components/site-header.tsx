@@ -13,21 +13,29 @@ type NavItem = {
 };
 
 function navFor(role: string | null, signedIn: boolean): NavItem[] {
-  const base: NavItem[] = [
+  const shop: NavItem[] = [
     { label: "Shop", to: "/shop" },
-    { label: "Ateliers", to: "/ateliers" },
-    { label: "Journal", to: "/journal" },
+    { label: "Designers", to: "/ateliers" },
+    { label: "Stories", to: "/journal" },
   ];
   if (role === "admin") {
-    return [...base, { label: "Desk", to: "/desk" }, { label: "Studio", to: "/studio" }, { label: "House", to: "/atelier-house" }];
+    return [
+      ...shop,
+      { label: "Messages", to: "/desk" },
+      { label: "Studio", to: "/studio" },
+      { label: "Admin", to: "/atelier-house" },
+    ];
   }
   if (role === "designer") {
-    return [...base, { label: "Desk", to: "/desk" }, { label: "Studio", to: "/studio" }];
+    return [
+      { label: "Messages", to: "/desk" },
+      { label: "Studio", to: "/studio" },
+    ];
   }
   if (signedIn) {
-    return [...base, { label: "Desk", to: "/desk" }, { label: "Style Quiz", to: "/quiz" }];
+    return [...shop, { label: "Messages", to: "/desk" }];
   }
-  return [...base, { label: "Style Quiz", to: "/quiz" }, { label: "Join", to: "/join" }];
+  return [...shop, { label: "Join", to: "/join" }];
 }
 
 export function SiteHeader() {
@@ -42,6 +50,7 @@ export function SiteHeader() {
   const isHome = pathname === "/";
   const onShowroom = pathname.startsWith("/s/") || /^\/ateliers\/[^/]+/.test(pathname);
   const overlay = (isHome || onShowroom) && !scrolled && !open;
+  const designerWork = role === "designer" && role !== "admin";
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -99,41 +108,45 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-1 sm:gap-2">
-          <Link
-            to="/shop"
-            aria-label="Search the shop"
-            className={cn(
-              "grid size-11 place-items-center rounded-full transition-colors",
-              overlay ? "text-ivory-50/80 hover:text-ivory-50" : "text-charcoal-500 hover:text-charcoal-800",
-            )}
-          >
-            <Search size={17} strokeWidth={1.5} />
-          </Link>
-          <Link
-            to="/account"
-            aria-label="Saved pieces"
-            className={cn(
-              "grid size-11 place-items-center rounded-full transition-colors",
-              overlay ? "text-ivory-50/80 hover:text-ivory-50" : "text-charcoal-500 hover:text-charcoal-800",
-            )}
-          >
-            <Heart size={17} strokeWidth={1.5} />
-          </Link>
-          <Link
-            to="/bag"
-            aria-label="Shopping bag"
-            className={cn(
-              "relative grid size-11 place-items-center rounded-full transition-colors",
-              overlay ? "text-ivory-50/80 hover:text-ivory-50" : "text-charcoal-500 hover:text-charcoal-800",
-            )}
-          >
-            <ShoppingBag size={17} strokeWidth={1.5} />
-            {mounted && count > 0 && (
-              <span className="absolute top-1.5 right-1.5 grid min-w-4 place-items-center rounded-full bg-gold-500 px-1 text-[9px] font-semibold text-ivory-50">
-                {count}
-              </span>
-            )}
-          </Link>
+          {designerWork ? null : (
+            <>
+              <Link
+                to="/shop"
+                aria-label="Search the shop"
+                className={cn(
+                  "grid size-11 place-items-center rounded-full transition-colors",
+                  overlay ? "text-ivory-50/80 hover:text-ivory-50" : "text-charcoal-500 hover:text-charcoal-800",
+                )}
+              >
+                <Search size={17} strokeWidth={1.5} />
+              </Link>
+              <Link
+                to="/account"
+                aria-label="Saved pieces"
+                className={cn(
+                  "grid size-11 place-items-center rounded-full transition-colors",
+                  overlay ? "text-ivory-50/80 hover:text-ivory-50" : "text-charcoal-500 hover:text-charcoal-800",
+                )}
+              >
+                <Heart size={17} strokeWidth={1.5} />
+              </Link>
+              <Link
+                to="/bag"
+                aria-label="Shopping bag"
+                className={cn(
+                  "relative grid size-11 place-items-center rounded-full transition-colors",
+                  overlay ? "text-ivory-50/80 hover:text-ivory-50" : "text-charcoal-500 hover:text-charcoal-800",
+                )}
+              >
+                <ShoppingBag size={17} strokeWidth={1.5} />
+                {mounted && count > 0 && (
+                  <span className="absolute top-1.5 right-1.5 grid min-w-4 place-items-center rounded-full bg-gold-500 px-1 text-[9px] font-semibold text-ivory-50">
+                    {count}
+                  </span>
+                )}
+              </Link>
+            </>
+          )}
           <div className="hidden sm:block">
             <AuthSlot light={overlay} />
           </div>
