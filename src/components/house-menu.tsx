@@ -142,7 +142,7 @@ export function HouseMenu({ light = false }: { light?: boolean }) {
             onClick={() => setOpen(false)}
           >
             <MessageSquare size={15} />
-            Desk
+            Messages
           </Link>
           {isAdmin ? (
             <Link
@@ -152,7 +152,7 @@ export function HouseMenu({ light = false }: { light?: boolean }) {
               onClick={() => setOpen(false)}
             >
               <Settings size={15} />
-              House ledger
+              Admin
             </Link>
           ) : null}
           <button
@@ -165,7 +165,7 @@ export function HouseMenu({ light = false }: { light?: boolean }) {
             }}
           >
             {theme === "charcoal" ? <Sun size={15} /> : <Moon size={15} />}
-            {theme === "charcoal" ? "Ivory floor" : "Charcoal floor"}
+            {theme === "charcoal" ? "Light look" : "Dark look"}
           </button>
           <button
             type="button"

@@ -14,6 +14,7 @@ import { SiteHeader } from "@/components/site-header";
 import { AuthProvider } from "@/lib/auth/provider";
 import { staticFloor } from "@/lib/house-mode";
 import { bootTheme } from "@/lib/theme";
+import { recordVisit } from "@/lib/visits";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Drapé Collective";
@@ -31,8 +32,7 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       {
         name: "description",
-        content:
-          "A private marketplace connecting independent fashion designers with discerning collectors. Discover unique, handcrafted fashion.",
+        content: "Shop original clothes from independent Kampala designers.",
       },
       { name: "theme-color", content: "#F6F1EA" },
     ],
@@ -41,7 +41,8 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       {
-        rel: "preconnect", href: "https://fonts.gstatic.com",
+        rel: "preconnect",
+        href: "https://fonts.gstatic.com",
         crossOrigin: "anonymous",
       },
       {
@@ -63,6 +64,10 @@ function RootDocument() {
     bootTheme();
   }, []);
 
+  useEffect(() => {
+    recordVisit(pathname || "/");
+  }, [pathname]);
+
   const inner = (
     <>
       <PreviewHostBridge />
@@ -74,8 +79,7 @@ function RootDocument() {
           <Toaster
             position="top-center"
             toastOptions={{
-              className:
-                "font-sans text-sm border-border bg-ivory-50 text-charcoal-800",
+              className: "font-sans text-sm border-border bg-ivory-50 text-charcoal-800",
             }}
           />
         </QueryClientProvider>
