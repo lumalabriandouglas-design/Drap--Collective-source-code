@@ -50,7 +50,7 @@ export function SiteHeader() {
   const isHome = pathname === "/";
   const onShowroom = pathname.startsWith("/s/") || /^\/ateliers\/[^/]+/.test(pathname);
   const overlay = (isHome || onShowroom) && !scrolled && !open;
-  const designerWork = role === "designer" && role !== "admin";
+  const designerWork = role === "designer";
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -71,7 +71,7 @@ export function SiteHeader() {
 
   const linkClass = (active: boolean) =>
     cn(
-      "text-[11px] tracking-[0.16em] uppercase transition-colors duration-300",
+      "relative py-1 text-[11px] tracking-[0.18em] uppercase transition-colors duration-300",
       active
         ? overlay
           ? "text-gold-300"
@@ -85,9 +85,7 @@ export function SiteHeader() {
     <header
       className={cn(
         "fixed inset-x-0 top-0 z-50 transition-all duration-500",
-        overlay
-          ? "bg-transparent"
-          : "border-b border-charcoal-100/80 bg-ivory-50/95 shadow-[0_1px_0_rgba(0,0,0,0.03)] backdrop-blur-xl",
+        overlay ? "bg-transparent" : "bg-ivory-50/92 backdrop-blur-xl",
       )}
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:h-[4.5rem] lg:px-8">
@@ -96,15 +94,20 @@ export function SiteHeader() {
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex">
-          {nav.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={linkClass(pathname === item.to || pathname.startsWith(`${item.to}/`))}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {nav.map((item) => {
+            const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
+            return (
+              <Link key={item.to} to={item.to} className={linkClass(active)}>
+                {item.label}
+                <span
+                  className={cn(
+                    "absolute inset-x-0 -bottom-1 mx-auto h-px w-4 transition-opacity duration-300",
+                    active ? "bg-gold-400 opacity-100" : "opacity-0",
+                  )}
+                />
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="flex items-center gap-1 sm:gap-2">
@@ -164,6 +167,12 @@ export function SiteHeader() {
           </button>
         </div>
       </div>
+      <div
+        className={cn(
+          "h-px w-full transition-colors duration-500",
+          overlay ? "bg-ivory-50/15" : "bg-gold-400/35",
+        )}
+      />
 
       {open && (
         <div className="fixed inset-x-0 top-16 bottom-0 z-40 overflow-y-auto bg-ivory-50 md:hidden">

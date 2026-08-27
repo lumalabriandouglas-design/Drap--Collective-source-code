@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { Mark } from "@/components/mark";
 import { Wordmark } from "@/components/wordmark";
 import { CURRENCIES } from "@/lib/format";
 import { useCurrency } from "@/lib/currency-store";
@@ -19,9 +20,7 @@ export function SiteFooter() {
             <div className="gold-line mt-6" />
           </div>
           <div>
-            <h4 className="mb-5 text-[10px] font-medium uppercase tracking-[0.18em] text-gold-600">
-              Explore
-            </h4>
+            <h4 className="mb-5 text-[10px] font-medium uppercase tracking-[0.18em] text-gold-600">Explore</h4>
             <div className="flex flex-col">
               <Link to="/shop" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">
                 Shop
@@ -38,9 +37,7 @@ export function SiteFooter() {
             </div>
           </div>
           <div>
-            <h4 className="mb-5 text-[10px] font-medium uppercase tracking-[0.18em] text-gold-600">
-              Help
-            </h4>
+            <h4 className="mb-5 text-[10px] font-medium uppercase tracking-[0.18em] text-gold-600">Help</h4>
             <div className="flex flex-col">
               <Link to="/desk" className="flex min-h-11 items-center text-sm font-light text-charcoal-500 hover:text-charcoal-800">
                 Messages
@@ -56,8 +53,9 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-border pt-8 sm:flex-row sm:items-center">
-          <p className="text-xs font-light tracking-wide text-charcoal-400">
-            © {new Date().getFullYear()} Drapé Collective
+          <p className="inline-flex items-center gap-2 text-xs font-light tracking-wide text-charcoal-400">
+            <Mark className="size-5" />
+            Kampala · © {new Date().getFullYear()}
           </p>
           <label className="flex min-h-11 items-center gap-2 text-xs text-charcoal-500">
             <span className="uppercase tracking-[0.12em]">Money</span>
