@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Heart, ShoppingBag } from "lucide-react";
 import { useState } from "react";
 import { HouseRoom, RolePill, RoomEmpty, RoomSkeleton, RoomStat } from "@/components/house-room";
+import { HouseAvatar } from "@/components/house-menu";
 import { LazyImage } from "@/components/lazy-image";
 import { Price } from "@/components/price";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,6 @@ function Account() {
 
   const orderList = orders.data ?? [];
   const savedList = saved.data ?? [];
-  const initial = (user.displayName ?? user.primaryEmail ?? "C").charAt(0).toUpperCase();
   const door = isAdmin ? "House" : isDesigner ? "Atelier" : "Collector";
 
   return (
@@ -71,17 +71,11 @@ function Account() {
       }
     >
       <section className="flex flex-col gap-8 sm:flex-row sm:items-center">
-        {user.profileImageUrl ? (
-          <img
-            src={user.profileImageUrl}
-            alt=""
-            className="size-20 rounded-full object-cover outline outline-1 -outline-offset-1 outline-charcoal-800/10"
-          />
-        ) : (
-          <span className="grid size-20 place-items-center rounded-full bg-charcoal-800 font-serif text-3xl text-ivory-50">
-            {initial}
-          </span>
-        )}
+        <HouseAvatar
+          src={user.profileImageUrl}
+          name={user.displayName ?? user.primaryEmail ?? "C"}
+          className="size-20 font-serif text-3xl outline outline-1 -outline-offset-1 outline-charcoal-800/10"
+        />
         <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-4">
           <RoomStat label="Door" value={door} />
           <RoomStat label="Orders" value={orderList.length} />

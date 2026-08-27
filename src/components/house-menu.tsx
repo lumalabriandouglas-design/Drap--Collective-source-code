@@ -4,9 +4,47 @@ import { useEffect, useRef, useState } from "react";
 import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { clearFloorSession } from "@/lib/floor-auth";
+import { displayImage } from "@/lib/media";
 import { readTheme, toggleTheme, type HouseTheme } from "@/lib/theme";
 import { useHouseRole } from "@/lib/use-role";
 import { cn } from "@/lib/utils";
+
+export function HouseAvatar({
+  src,
+  name,
+  light = false,
+  className,
+}: {
+  src?: string | null;
+  name: string;
+  light?: boolean;
+  className?: string;
+}) {
+  const [broken, setBroken] = useState(false);
+  const initial = (name.trim().charAt(0) || "A").toUpperCase();
+  const photo = src && !broken ? displayImage(src, 480) : null;
+  if (!photo) {
+    return (
+      <span
+        className={cn(
+          "grid place-items-center rounded-full text-xs",
+          light ? "bg-ivory-50/15 text-ivory-50" : "bg-charcoal-800 text-ivory-50",
+          className,
+        )}
+      >
+        {initial}
+      </span>
+    );
+  }
+  return (
+    <img
+      src={photo}
+      alt=""
+      className={cn("rounded-full object-cover", className)}
+      onError={() => setBroken(true)}
+    />
+  );
+}
 
 export function HouseMenu({ light = false }: { light?: boolean }) {
   const { user } = useCurrentUserState();
@@ -45,7 +83,6 @@ export function HouseMenu({ light = false }: { light?: boolean }) {
 
   if (!user) return null;
   const label = user.displayName ?? user.primaryEmail ?? "Account";
-  const initial = label.charAt(0).toUpperCase();
 
   async function leave() {
     setLeaving(true);
@@ -69,18 +106,7 @@ export function HouseMenu({ light = false }: { light?: boolean }) {
           light ? "text-ivory-50/90 hover:text-ivory-50" : "text-charcoal-600 hover:text-charcoal-800",
         )}
       >
-        {user.profileImageUrl ? (
-          <img src={user.profileImageUrl} alt="" className="size-8 rounded-full object-cover" />
-        ) : (
-          <span
-            className={cn(
-              "grid size-8 place-items-center rounded-full text-xs",
-              light ? "bg-ivory-50/15 text-ivory-50" : "bg-charcoal-800 text-ivory-50",
-            )}
-          >
-            {initial}
-          </span>
-        )}
+        <HouseAvatar src={user.profileImageUrl} name={label} light={light} className="size-8" />
         <span className="hidden max-w-[8rem] truncate sm:inline">{label}</span>
         <ChevronDown size={14} className={cn("transition-transform", open && "rotate-180")} />
       </button>
