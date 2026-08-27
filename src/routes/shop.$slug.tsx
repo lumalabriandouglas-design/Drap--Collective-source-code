@@ -43,9 +43,7 @@ function ProductPage() {
   const [size, setSize] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [saved, setSaved] = useState(false);
-  const images = product?.imageUrls?.length
-    ? product.imageUrls
-    : ["/images/products/studio-2.jpg"];
+  const images = product?.imageUrls?.length ? product.imageUrls : ["/images/products/studio-2.jpg"];
 
   const selectedSize = useMemo(() => {
     if (size) return size;
@@ -68,9 +66,9 @@ function ProductPage() {
     return (
       <main className="mx-auto max-w-xl px-4 pt-32 pb-24 text-center">
         <h1 className="font-serif text-4xl text-charcoal-800">Piece not found</h1>
-        <p className="mt-3 text-sm text-charcoal-400">It may have left the floor.</p>
+        <p className="mt-3 text-sm text-charcoal-400">It may have been removed.</p>
         <Button asChild className="mt-8">
-          <Link to="/shop">Return to the shop</Link>
+          <Link to="/shop">Back to shop</Link>
         </Button>
       </main>
     );
@@ -80,7 +78,7 @@ function ProductPage() {
 
   function addToBag() {
     if (!selectedSize) {
-      toast("Select a size to continue");
+      toast("Pick a size first");
       return;
     }
     add({
@@ -94,7 +92,7 @@ function ProductPage() {
       priceCents: piece.priceCents,
       size: selectedSize,
     });
-    toast.success("Added to your bag");
+    toast.success("Added to bag");
   }
 
   async function onSave() {
@@ -106,9 +104,9 @@ function ProductPage() {
     try {
       const result = await toggleWishlist({ data: piece.id });
       setSaved(result.saved);
-      toast(result.saved ? "Saved to your closet" : "Removed from saved");
+      toast(result.saved ? "Saved" : "Removed from saved");
     } catch {
-      toast.error("Could not update saved pieces");
+      toast.error("Could not save that piece");
     }
   }
 
@@ -128,14 +126,14 @@ function ProductPage() {
           pieceSlug: piece.slug,
           pieceName: piece.name,
           pieceImage: images[0],
-          message: note || `I would like to enquire about ${piece.name}.`,
+          message: note || `I would like to ask about ${piece.name}.`,
         },
       });
       setNote("");
-      toast.success("Note is on the desk");
+      toast.success("Message sent");
       void navigate({ to: "/desk/$threadId", params: { threadId: thread.id } });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not send the note");
+      toast.error(err instanceof Error ? err.message : "Could not send the message");
     }
   }
 
@@ -144,13 +142,7 @@ function ProductPage() {
       <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-16">
         <div>
           <div className="overflow-hidden rounded-2xl bg-ivory-100">
-            <LazyImage
-              src={images[active] ?? images[0]}
-              alt={product.name}
-              width={1440}
-              eager
-              className="aspect-portrait w-full"
-            />
+            <LazyImage src={images[active] ?? images[0]} alt={product.name} width={1440} eager className="aspect-portrait w-full" />
           </div>
           {images.length > 1 && (
             <div className="mt-3 flex gap-2">
@@ -171,38 +163,21 @@ function ProductPage() {
         </div>
 
         <div>
-          <Link
-            to="/s/$slug"
-            params={{ slug: product.designer.slug }}
-            className="text-[11px] font-medium uppercase tracking-[0.16em] text-gold-600"
-          >
-            {product.designer.name} · showroom
+          <Link to="/s/$slug" params={{ slug: product.designer.slug }} className="text-[11px] font-medium uppercase tracking-[0.16em] text-gold-600">
+            {product.designer.name}
           </Link>
-          <h1 className="mt-3 font-serif text-4xl text-charcoal-800 sm:text-5xl">
-            {product.name}
-          </h1>
-          <Price
-            cents={product.priceCents}
-            className="mt-4 block text-xl text-charcoal-800"
-          />
-          <p className="mt-6 max-w-md text-sm font-light leading-relaxed text-charcoal-500">
-            {product.description}
-          </p>
+          <h1 className="mt-3 font-serif text-4xl text-charcoal-800 sm:text-5xl">{product.name}</h1>
+          <Price cents={product.priceCents} className="mt-4 block text-xl text-charcoal-800" />
+          <p className="mt-6 max-w-md text-sm font-light leading-relaxed text-charcoal-500">{product.description}</p>
           {product.leadTime && (
-            <p className="mt-4 text-xs uppercase tracking-[0.12em] text-charcoal-400">
-              {product.leadTime}
-            </p>
+            <p className="mt-4 text-xs uppercase tracking-[0.12em] text-charcoal-400">{product.leadTime}</p>
           )}
           {isPreviewPiece(product) && (
-            <p className="mt-3 text-[10px] font-medium uppercase tracking-[0.16em] text-gold-600">
-              On this preview only
-            </p>
+            <p className="mt-3 text-[10px] font-medium uppercase tracking-[0.16em] text-gold-600">On this preview only</p>
           )}
 
           <div className="mt-8">
-            <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-gold-600">
-              Size
-            </p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-gold-600">Size</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {product.sizes.map((option) => (
                 <button
@@ -223,7 +198,7 @@ function ProductPage() {
 
           {product.materials.length > 0 && (
             <p className="mt-6 text-sm text-charcoal-500">
-              <span className="text-charcoal-400">Materials · </span>
+              <span className="text-charcoal-400">Cloth · </span>
               {product.materials.join(", ")}
             </p>
           )}
@@ -241,19 +216,17 @@ function ProductPage() {
           <div className="mt-10 rounded-2xl border border-charcoal-100 bg-ivory-50 p-5">
             <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.16em] text-gold-600">
               <MessageCircle size={14} />
-              Write to the atelier
+              Message {product.designer.name}
             </p>
-            <p className="mt-2 text-sm font-light text-charcoal-500">
-              The house holds this note. {product.designer.name} replies at the desk — it never leaves Drapé.
-            </p>
+            <p className="mt-2 text-sm font-light text-charcoal-500">Ask a question. They reply in Messages.</p>
             <Textarea
               className="mt-3 bg-white text-base"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="A commission, a size question, a private viewing…"
+              placeholder="Size, cloth, or a custom order…"
             />
             <Button className="mt-3" variant="outline" onClick={() => void onEnquire()}>
-              Send to the desk
+              Send message
             </Button>
           </div>
         </div>
@@ -261,7 +234,7 @@ function ProductPage() {
 
       {(related.data ?? []).length > 0 && (
         <section className="mt-20">
-          <h2 className="font-serif text-3xl text-charcoal-800">You may also keep</h2>
+          <h2 className="font-serif text-3xl text-charcoal-800">More like this</h2>
           <div className="gold-line my-6" />
           <ProductGrid products={related.data ?? []} />
         </section>
