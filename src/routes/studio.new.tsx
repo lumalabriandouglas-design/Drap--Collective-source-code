@@ -160,7 +160,7 @@ function NewPiece() {
         setNote(
           uploaded.backend === "r2"
             ? `On Cloudflare · ${formatBytes(result.compressedSize)}`
-            : `Stored ${formatBytes(result.compressedSize)} · ${result.width}×${result.height}`,
+            : `Saved on this preview · ${formatBytes(result.compressedSize)} · ${result.width}×${result.height}`,
         );
       }
     } catch (err) {
@@ -213,7 +213,7 @@ function NewPiece() {
       lede={
         storage.data?.r2
           ? "Up to five photographs. They go to Cloudflare — the house only keeps your account."
-          : "Up to five photographs. On Vercel they go to Cloudflare once the R2 keys are present."
+          : "Up to five photographs. If Cloudflare is still connecting, the picture stays on this preview so you can finish the listing."
       }
       actions={
         <Button asChild variant="outline">
