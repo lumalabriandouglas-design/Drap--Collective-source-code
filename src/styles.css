@@ -142,7 +142,8 @@ html[data-theme="charcoal"] body {
 }
 
 html[data-theme="charcoal"] .bg-ivory-50,
-html[data-theme="charcoal"] .bg-ivory-50\/95 {
+html[data-theme="charcoal"] .bg-ivory-50\/95,
+html[data-theme="charcoal"] .bg-ivory-50\/92 {
   background-color: oklch(12% 0.012 14);
 }
 
@@ -204,6 +205,19 @@ html[data-theme="charcoal"] .hover\:bg-charcoal-800:hover {
   width: 2.5rem;
   height: 1px;
   background: var(--color-gold-400);
+  transform-origin: left center;
+  animation: stitch-draw 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes stitch-draw {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
 }
 
 .font-serif {
@@ -232,7 +246,7 @@ html[data-theme="charcoal"] .hover\:bg-charcoal-800:hover {
 @keyframes drape-rise {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(14px);
   }
   to {
     opacity: 1;
@@ -241,7 +255,7 @@ html[data-theme="charcoal"] .hover\:bg-charcoal-800:hover {
 }
 
 .rise-in {
-  animation: drape-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: drape-rise 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .hero-progress {
@@ -319,7 +333,8 @@ html[data-theme="charcoal"] .hover\:bg-charcoal-800:hover {
 
   .rise-in,
   .hero-kenburns,
-  .hero-progress {
+  .hero-progress,
+  .gold-line {
     animation: none;
   }
 }
