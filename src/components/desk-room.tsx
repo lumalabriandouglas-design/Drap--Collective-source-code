@@ -87,21 +87,21 @@ export function DeskInbox({
   const threads = useDeskList(userId, isAdmin, aliases);
   return (
     <HouseRoom
-      eyebrow="The desk"
-      title="House notes"
+      eyebrow="Messages"
+      title="Your messages"
       lede={
         isDesigner
-          ? "Notes from collectors sit here. Reply in the house — the relationship never leaves Drapé."
-          : "Write to an atelier from a piece. They reply here. The house keeps the conversation."
+          ? "People write to you here. Reply in this box — they will see it."
+          : "Write to a designer from a piece. Their reply lands here."
       }
     >
       {threads.length === 0 ? (
         <RoomEmpty
-          title="The desk is quiet"
-          body="Open a piece and write to the atelier. They will find the note in their studio."
+          title="No messages yet"
+          body="Open a piece in the shop and tap Message. The designer will answer here."
           action={
             <Button asChild>
-              <Link to="/shop">Walk the floor</Link>
+              <Link to="/shop">Go to shop</Link>
             </Button>
           }
         />
@@ -152,9 +152,9 @@ export function DeskConversation({
 
   if (!thread || !allowed) {
     return (
-      <HouseRoom eyebrow="The desk" title="Note not found" lede="This conversation is not on your desk.">
+      <HouseRoom eyebrow="Messages" title="Message not found" lede="This chat is not on your list.">
         <Button asChild variant="outline">
-          <Link to="/desk">Back to the desk</Link>
+          <Link to="/desk">Back to messages</Link>
         </Button>
       </HouseRoom>
     );
@@ -180,8 +180,8 @@ export function DeskConversation({
       <div className="mx-auto grid max-w-6xl lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)]">
         <aside className="hidden border-r border-charcoal-100 lg:block lg:pt-24">
           <div className="px-4 pb-4 lg:px-6">
-            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">The desk</p>
-            <h1 className="mt-2 font-serif text-3xl text-charcoal-800">House notes</h1>
+            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">Messages</p>
+            <h1 className="mt-2 font-serif text-3xl text-charcoal-800">Inbox</h1>
           </div>
           <div className="border-t border-charcoal-100">
             {threads.map((item) => (
@@ -196,7 +196,7 @@ export function DeskConversation({
               to="/desk"
               className="text-[10px] uppercase tracking-[0.16em] text-charcoal-400 hover:text-charcoal-800 lg:hidden"
             >
-              Back to the desk
+              Back to messages
             </Link>
             <h2 className="mt-2 font-serif text-3xl text-charcoal-800">{other.name}</h2>
             {thread.pieceSlug && thread.pieceName ? (
@@ -221,7 +221,7 @@ export function DeskConversation({
 
           <form onSubmit={(e) => void onReply(e)} className="border-t border-charcoal-100 bg-ivory-50 px-4 py-4 sm:px-6">
             <label htmlFor="desk-note" className="sr-only">
-              Write a note
+              Write a message
             </label>
             <Textarea
               id="desk-note"
@@ -232,9 +232,9 @@ export function DeskConversation({
               required
             />
             <div className="mt-3 flex items-center justify-between gap-3">
-              <p className="text-[11px] text-charcoal-400">Stays in the house.</p>
+              <p className="text-[11px] text-charcoal-400">Stays on Drapé.</p>
               <Button type="submit" disabled={busy}>
-                {busy ? "Sending…" : "Send note"}
+                {busy ? "Sending…" : "Send"}
               </Button>
             </div>
           </form>
@@ -248,7 +248,7 @@ function NoteBubble({ note, mine }: { note: DeskMessage; mine: boolean }) {
   if (note.kind === "house") {
     return (
       <div className="mx-auto max-w-md px-4 py-2 text-center">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-gold-600">The house</p>
+        <p className="text-[10px] uppercase tracking-[0.16em] text-gold-600">Drapé</p>
         <p className="mt-1 text-sm font-light text-pretty text-charcoal-500">{note.content}</p>
       </div>
     );
