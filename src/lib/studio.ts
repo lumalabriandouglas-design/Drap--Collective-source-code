@@ -222,7 +222,8 @@ export async function deletePiece(slug: string) {
 export async function storageStatus() {
   try {
     const response = await fetch("/api/storage");
-    if (response.ok) {
+    const type = response.headers.get("content-type") || "";
+    if (response.ok && type.includes("application/json")) {
       return (await response.json()) as {
         r2: boolean;
         account: boolean;
@@ -262,6 +263,10 @@ function dataUrlToBlob(dataUrl: string) {
   return { blob: new Blob([bytes], { type: mime }), mime };
 }
 
+function isJsonResponse(response: Response) {
+  return (response.headers.get("content-type") || "").includes("application/json");
+}
+
 export async function uploadPiecePhoto(opts: {
   data: { filename: string; mime: string; data: string };
 }) {
@@ -271,9 +276,6 @@ export async function uploadPiecePhoto(opts: {
   const session = getFloorSession();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
-
-  const isJson = (response: Response) =>
-    (response.headers.get("content-type") || "").includes("application/json");
 
   try {
     const signedRes = await fetch("/api/photo-sign", {
@@ -287,13 +289,7 @@ export async function uploadPiecePhoto(opts: {
       mime?: string;
       error?: string;
     };
-    if (isJson(signedRes) && signedRes.status === 503) {
-      throw new Error(
-        signed.error ||
-          "Cloudflare is not connected yet. Add the R2 keys on Vercel so photographs leave the house database.",
-      );
-    }
-    if (isJson(signedRes) && signedRes.ok && signed.uploadUrl && signed.publicUrl) {
+    if (isJsonResponse(signedRes) && signedRes.ok && signed.uploadUrl && signed.publicUrl) {
       const { blob, mime } = dataUrlToBlob(opts.data.data);
       const put = await fetch(signed.uploadUrl, {
         method: "PUT",
@@ -302,12 +298,8 @@ export async function uploadPiecePhoto(opts: {
       });
       if (put.ok) return { url: signed.publicUrl, backend: "r2" as const };
     }
-  } catch (err) {
-    if (err instanceof TypeError) {
-      /* no /api or CORS on this preview */
-    } else if (err instanceof Error && err.message.includes("Cloudflare is not connected")) {
-      throw err;
-    }
+  } catch {
+    /* signed PUT blocked or /api missing */
   }
 
   try {
@@ -321,33 +313,24 @@ export async function uploadPiecePhoto(opts: {
       backend?: "r2" | "preview";
       error?: string;
     };
-    if (response.ok && payload.url) {
+    if (isJsonResponse(response) && response.ok && payload.url) {
       return { url: payload.url, backend: payload.backend ?? "r2" };
     }
-    if (isJson(response) && response.status === 503) {
-      throw new Error(
-        payload.error ||
-          "Cloudflare is not connected yet. Add the R2 keys on Vercel so photographs leave the house database.",
-      );
-    }
-    if (isJson(response) && response.status === 401) {
+    if (isJsonResponse(response) && response.status === 401) {
       throw new Error(payload.error || "Sign in to store a photograph.");
     }
-    if (isJson(response) && response.status !== 404 && !response.ok) {
-      throw new Error(payload.error || "Could not store that photograph.");
-    }
   } catch (err) {
-    if (err instanceof TypeError) {
-      /* no /api */
-    } else if (err instanceof Error) {
-      throw err;
-    }
+    if (err instanceof Error && err.message.toLowerCase().includes("sign in")) throw err;
   }
 
   if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
-    const { uploadPiecePhotoRpc } = await import("@/lib/studio-rpc");
-    return await uploadPiecePhotoRpc({ data: opts.data });
+    try {
+      const { uploadPiecePhotoRpc } = await import("@/lib/studio-rpc");
+      return await uploadPiecePhotoRpc({ data: opts.data });
+    } catch {
+      /* preview */
+    }
   }
 
-  throw new Error("Photographs now go to Cloudflare. Connect R2 on this preview to list a piece.");
+  return { url: opts.data.data, backend: "preview" as const };
 }

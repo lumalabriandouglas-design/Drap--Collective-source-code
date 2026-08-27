@@ -30,30 +30,48 @@ export type R2Status = {
   missing: string[];
 };
 
+function env(names: string[]) {
+  for (const name of names) {
+    const raw = process.env[name];
+    if (typeof raw !== "string") continue;
+    const value = raw.trim().replace(/^['"]|['"]$/g, "").replace(/\/$/, "");
+    if (value) return value;
+  }
+  return "";
+}
+
 function isApiEndpoint(url: string) {
   return url.includes(".r2.cloudflarestorage.com");
 }
 
 function publicBaseFromEnv() {
-  const raw = (process.env.R2_PUBLIC_BASE || process.env.R2_PUBLIC_URL || "").replace(/\/$/, "");
+  const raw = env(["R2_PUBLIC_BASE", "R2_PUBLIC_URL", "R2_PUBLIC_DOMAIN", "VITE_R2_PUBLIC_BASE"]);
   if (!raw || isApiEndpoint(raw)) return "";
   return raw;
 }
 
 function readConfig(): R2Config | null {
-  const accountId = process.env.R2_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID || HOUSE.accountId;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID || "";
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || "";
-  const bucket = process.env.R2_BUCKET || process.env.R2_BUCKET_NAME || HOUSE.bucket;
+  const accountId = env(["R2_ACCOUNT_ID", "CLOUDFLARE_ACCOUNT_ID"]) || HOUSE.accountId;
+  const accessKeyId = env(["R2_ACCESS_KEY_ID", "CLOUDFLARE_R2_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"]);
+  const secretAccessKey = env([
+    "R2_SECRET_ACCESS_KEY",
+    "R2_SECRET_KEY",
+    "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
+    "AWS_SECRET_ACCESS_KEY",
+  ]);
+  const bucket = env(["R2_BUCKET", "R2_BUCKET_NAME"]) || HOUSE.bucket;
   const publicBase = publicBaseFromEnv();
   if (!accountId || !accessKeyId || !secretAccessKey || !bucket || !publicBase) return null;
   return { accountId, accessKeyId, secretAccessKey, bucket, publicBase };
 }
 
 export function r2Status(): R2Status {
-  const account = Boolean(process.env.R2_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID || HOUSE.accountId);
-  const bucket = Boolean(process.env.R2_BUCKET || process.env.R2_BUCKET_NAME || HOUSE.bucket);
-  const keys = Boolean(process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY);
+  const account = Boolean(env(["R2_ACCOUNT_ID", "CLOUDFLARE_ACCOUNT_ID"]) || HOUSE.accountId);
+  const bucket = Boolean(env(["R2_BUCKET", "R2_BUCKET_NAME"]) || HOUSE.bucket);
+  const keys = Boolean(
+    env(["R2_ACCESS_KEY_ID", "CLOUDFLARE_R2_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"]) &&
+      env(["R2_SECRET_ACCESS_KEY", "R2_SECRET_KEY", "CLOUDFLARE_R2_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"]),
+  );
   const publicUrl = Boolean(publicBaseFromEnv());
   const missing: string[] = [];
   if (!keys) {

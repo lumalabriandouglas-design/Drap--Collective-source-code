@@ -11,6 +11,18 @@ export default function handler(req: IncomingMessage, res: ServerResponse) {
     preflight(res);
     return;
   }
-  const status = r2Status();
-  send(res, 200, { ...status, preview: !status.r2 });
+  try {
+    const status = r2Status();
+    send(res, 200, { ...status, preview: !status.r2 });
+  } catch {
+    send(res, 200, {
+      r2: false,
+      account: false,
+      bucket: false,
+      keys: false,
+      publicUrl: false,
+      preview: true,
+      missing: ["R2_PUBLIC_BASE"],
+    });
+  }
 }

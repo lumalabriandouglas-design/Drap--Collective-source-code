@@ -23,9 +23,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   const status = r2Status();
   if (!status.r2) {
     send(res, 503, {
-      error:
-        "Cloudflare R2 is not connected on this preview. Add R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_PUBLIC_BASE.",
+      error: "Cloudflare R2 is not ready on this preview.",
       missing: status.missing,
+      preview: true,
     });
     return;
   }
