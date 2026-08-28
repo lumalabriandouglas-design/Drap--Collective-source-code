@@ -1,28 +1,29 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
-import { r2Status } from "../src/lib/r2";
-import { preflight, send } from "./_http";
+import { r2Status } from "./_r2";
 
-export const config = {
-  runtime: "nodejs",
-};
+export const config = { runtime: "nodejs" };
 
-export default function handler(req: IncomingMessage, res: ServerResponse) {
-  if (req.method === "OPTIONS") {
-    preflight(res);
-    return;
-  }
+export default function handler(_req: unknown, res: {
+  statusCode: number;
+  setHeader: (k: string, v: string) => void;
+  end: (body: string) => void;
+}) {
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Cache-Control", "no-store");
   try {
     const status = r2Status();
-    send(res, 200, { ...status, preview: !status.r2 });
+    res.end(JSON.stringify({ ...status, preview: !status.r2 }));
   } catch {
-    send(res, 200, {
-      r2: false,
-      account: false,
-      bucket: false,
-      keys: false,
-      publicUrl: false,
-      preview: true,
-      missing: ["R2_PUBLIC_BASE"],
-    });
+    res.end(
+      JSON.stringify({
+        r2: false,
+        account: true,
+        bucket: true,
+        keys: false,
+        publicUrl: false,
+        preview: true,
+        missing: ["R2_PUBLIC_BASE"],
+      }),
+    );
   }
 }

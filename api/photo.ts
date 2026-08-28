@@ -1,18 +1,15 @@
+import { putR2Object, r2Status } from "./_r2";
+import { bearer, readJson, send, who } from "./_http";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { r2Status, storeImage } from "../src/lib/r2";
-import { bearer, preflight, readJson, send, who } from "./_http";
 
-export const config = {
-  runtime: "nodejs",
-  maxDuration: 30,
-  api: { bodyParser: true },
-};
+export const config = { runtime: "nodejs", maxDuration: 30 };
 
 type Body = { filename?: string; mime?: string; data?: string };
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   if (req.method === "OPTIONS") {
-    preflight(res);
+    res.statusCode = 204;
+    res.end();
     return;
   }
   if (req.method !== "POST") {
@@ -22,11 +19,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   const status = r2Status();
   if (!status.r2) {
-    send(res, 503, {
-      error: "Cloudflare R2 is not ready on this preview.",
-      missing: status.missing,
-      preview: true,
-    });
+    send(res, 503, { error: "r2-not-ready", missing: status.missing });
     return;
   }
 
@@ -58,13 +51,17 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       send(res, 413, { error: "That photo is still too large after compression." });
       return;
     }
-    const stored = await storeImage({
+    const url = await putR2Object({
       filename: body.filename || "piece.webp",
       mime,
-      bytes,
+      bytes: new Uint8Array(bytes),
       folder: `pieces/${userId}`,
     });
-    send(res, 200, stored);
+    if (!url) {
+      send(res, 503, { error: "r2-not-ready", missing: status.missing });
+      return;
+    }
+    send(res, 200, { url, backend: "r2" });
   } catch (err) {
     send(res, 500, { error: err instanceof Error ? err.message : "Could not store that photograph." });
   }
