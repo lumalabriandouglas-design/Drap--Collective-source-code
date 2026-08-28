@@ -8,7 +8,6 @@ import {
   relatedOf,
   type ProductFilter,
 } from "@/lib/catalog-core";
-import { listPreviewPieces } from "@/lib/preview-rail";
 
 export async function listProducts(opts: { data?: ProductFilter } = {}) {
   const data = opts.data ?? {};
@@ -16,10 +15,7 @@ export async function listProducts(opts: { data?: ProductFilter } = {}) {
     try {
       const { listProductsRpc } = await import("@/lib/catalog-rpc");
       const rows = await listProductsRpc({ data });
-      if (rows.length) {
-        const extra = listPreviewPieces().filter((p) => !rows.some((row) => row.slug === p.slug));
-        return filterProducts([...extra, ...rows], data);
-      }
+      if (rows.length) return filterProducts(rows, data);
     } catch {
       /* live floor */
     }
@@ -37,11 +33,7 @@ export async function getProduct(opts: { data: string }) {
       /* live floor */
     }
   }
-  return (
-    (await liveFloor()).products.find((p) => p.slug === opts.data) ??
-    listPreviewPieces().find((p) => p.slug === opts.data) ??
-    null
-  );
+  return (await liveFloor()).products.find((p) => p.slug === opts.data) ?? null;
 }
 
 export async function listRelated(opts: {

@@ -1,36 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { DesignerShowroom } from "@/components/showroom";
-import { Button } from "@/components/ui/button";
-import { getDesigner } from "@/lib/catalog";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/ateliers/$slug")({ component: AtelierShowroom });
-
-function AtelierShowroom() {
-  const { slug } = Route.useParams();
-  const query = useQuery({
-    queryKey: ["designer", slug],
-    queryFn: () => getDesigner({ data: slug }),
-  });
-
-  if (query.isLoading) {
-    return (
-      <main className="min-h-dvh bg-charcoal-900">
-        <div className="h-[88vh] animate-pulse bg-charcoal-800" />
-      </main>
-    );
-  }
-
-  if (!query.data) {
-    return (
-      <main className="mx-auto max-w-xl px-4 pt-32 pb-24 text-center">
-        <h1 className="font-serif text-4xl">Atelier not found</h1>
-        <Button asChild className="mt-8">
-          <Link to="/ateliers">All ateliers</Link>
-        </Button>
-      </main>
-    );
-  }
-
-  return <DesignerShowroom designer={query.data.designer} pieces={query.data.pieces} />;
-}
+export const Route = createFileRoute("/ateliers/$slug")({
+  beforeLoad: ({ params }) => {
+    throw redirect({ to: "/s/$slug", params: { slug: params.slug } });
+  },
+  component: () => null,
+});

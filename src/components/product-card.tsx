@@ -15,32 +15,35 @@ export function ProductCard({
 }) {
   const image = product.imageUrls[0] ?? "/images/products/studio-2.jpg";
   return (
-    <Link
-      to="/shop/$slug"
-      params={{ slug: product.slug }}
-      className="group block rise-in"
-      style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
-    >
-      <LazyImage
-        src={image}
-        alt={product.name}
-        width={900}
-        eager={index < 6}
-        className="relative aspect-portrait rounded-xl"
-        imgClassName="transition-transform duration-700 ease-out group-hover:scale-[1.04]"
-      />
+    <article className="rise-in" style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}>
+      <Link to="/shop/$slug" params={{ slug: product.slug }} className="group block">
+        <LazyImage
+          src={image}
+          alt={product.name}
+          width={900}
+          eager={index < 6}
+          className="relative aspect-portrait rounded-xl"
+          imgClassName="transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+        />
+      </Link>
       <div className="mt-3.5 px-0.5">
-        {showDesigner && (
-          <p className="mb-1 truncate text-[11px] font-medium uppercase tracking-[0.1em] text-charcoal-400">
+        {showDesigner ? (
+          <Link
+            to="/s/$slug"
+            params={{ slug: product.designer.slug }}
+            className="mb-1 block truncate text-[11px] font-medium uppercase tracking-[0.1em] text-charcoal-400 hover:text-gold-600"
+          >
             {product.designer.name}
-          </p>
-        )}
-        <h3 className="font-serif text-[15px] font-medium leading-snug text-charcoal-800 transition-colors group-hover:text-charcoal-600">
-          {product.name}
-        </h3>
-        <Price cents={product.priceCents} className="mt-1.5 block text-sm text-charcoal-700" />
+          </Link>
+        ) : null}
+        <Link to="/shop/$slug" params={{ slug: product.slug }} className="group block">
+          <h3 className="font-serif text-[15px] font-medium leading-snug text-charcoal-800 transition-colors group-hover:text-charcoal-600">
+            {product.name}
+          </h3>
+          <Price cents={product.priceCents} className="mt-1.5 block text-sm text-charcoal-700" />
+        </Link>
       </div>
-    </Link>
+    </article>
   );
 }
 
