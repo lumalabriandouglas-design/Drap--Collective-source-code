@@ -10,8 +10,6 @@ import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { bagTotal, useBag } from "@/lib/bag-store";
 import { placeOrder } from "@/lib/commerce";
-import { openDeskNote } from "@/lib/desk";
-import { getFloorSession } from "@/lib/floor-auth";
 import { houseError } from "@/lib/errors";
 import { useCurrency } from "@/lib/currency-store";
 
@@ -55,6 +53,8 @@ function Checkout() {
             slug: item.slug,
             name: item.name,
             designerName: item.designerName,
+            designerSlug: item.designerSlug,
+            designerUserId: item.designerUserId,
             image: item.image,
             priceCents: item.priceCents,
             size: item.size,
@@ -62,36 +62,9 @@ function Checkout() {
           })),
         },
       });
-      let deskId: string | null = null;
-      if (getFloorSession()) {
-        const seen = new Set<string>();
-        for (const item of items) {
-          const atelierId = item.designerUserId || item.designerSlug;
-          if (!atelierId || seen.has(atelierId)) continue;
-          seen.add(atelierId);
-          const lines = items
-            .filter((row) => (row.designerUserId || row.designerSlug) === atelierId)
-            .map((row) => `${row.name}, size ${row.size} × ${row.qty}`);
-          try {
-            const thread = await openDeskNote({
-              atelierId,
-              atelierName: item.designerName,
-              atelierSlug: item.designerSlug,
-              pieceSlug: item.slug,
-              pieceName: item.name,
-              pieceImage: item.image,
-              message: `Commission placed with the house.\n${lines.join("\n")}\n${form.shippingName}, ${form.shippingCity}.`,
-            });
-            deskId = thread.id;
-          } catch {
-            /* desk is extra */
-          }
-        }
-      }
       clear();
       toast.success(`Commission ${result.orderId} is with the house`);
-      if (deskId) void navigate({ to: "/desk/$threadId", params: { threadId: deskId } });
-      else void navigate({ to: "/account" });
+      void navigate({ to: "/account" });
     } catch (err) {
       toast.error(houseError(err));
     } finally {
