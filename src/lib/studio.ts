@@ -216,6 +216,23 @@ export async function deletePiece(slug: string) {
 }
 
 export async function storageStatus() {
+  try {
+    const response = await fetch("/api/storage");
+    const type = response.headers.get("content-type") || "";
+    if (response.ok && type.includes("application/json")) {
+      return (await response.json()) as {
+        r2: boolean;
+        account: boolean;
+        bucket: boolean;
+        keys: boolean;
+        publicUrl: boolean;
+        preview?: boolean;
+        missing: string[];
+      };
+    }
+  } catch {
+    /* house keeps its own counsel */
+  }
   return {
     r2: false,
     account: true,
@@ -232,6 +249,31 @@ function dataUrlToBlob(dataUrl: string) {
   const mime = header.match(/data:(.*?);/)?.[1] || "image/webp";
   const bytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
   return { blob: new Blob([bytes], { type: mime }), mime };
+}
+
+async function uploadToCloudflare(input: {
+  token: string;
+  filename: string;
+  mime: string;
+  dataUrl: string;
+}) {
+  const response = await fetch("/api/photo", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${input.token}`,
+    },
+    body: JSON.stringify({
+      filename: input.filename,
+      mime: input.mime,
+      data: input.dataUrl,
+    }),
+  });
+  const type = response.headers.get("content-type") || "";
+  if (!response.ok || !type.includes("application/json")) return null;
+  const payload = (await response.json().catch(() => null)) as { url?: string } | null;
+  if (!payload?.url || !payload.url.startsWith("http")) return null;
+  return payload.url;
 }
 
 async function uploadToSupabase(input: {
@@ -269,6 +311,18 @@ export async function uploadPiecePhoto(opts: {
   }
   const session = getFloorSession();
   if (!session?.accessToken) throw new Error("Sign in to store a photograph.");
+
+  try {
+    const url = await uploadToCloudflare({
+      token: session.accessToken,
+      filename: opts.data.filename,
+      mime: opts.data.mime,
+      dataUrl: opts.data.data,
+    });
+    if (url) return { url, backend: "r2" as const };
+  } catch {
+    /* the bucket stays behind the drapes */
+  }
 
   const url = await uploadToSupabase({
     token: session.accessToken,

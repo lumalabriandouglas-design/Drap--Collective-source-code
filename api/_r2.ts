@@ -1,7 +1,7 @@
 import { AwsClient } from "aws4fetch";
 
 const HOUSE = {
-  accountId: "558dca581274b42590d6dfd88a9e24".replace("9e24", "1e24"),
+  accountId: "558dca581274b42590d6dfd88a9a1e24",
   bucket: "odrapecollective",
 };
 
