@@ -39,11 +39,11 @@ export function houseError(err: unknown): string {
     return "The house could not be reached. Try again in a moment.";
   }
   if (msg.includes("too large")) return "That photograph is still too large after compression.";
-  if (msg.includes("not connected") || msg.includes("r2")) {
-    return "Photo storage is not connected yet. Publish needs Cloudflare so the picture stays on the house.";
+  if (msg.includes("not connected") || msg.includes("cloudflare") || msg.includes("r2")) {
+    return "Could not store that photograph. Sign in again and try a smaller picture.";
   }
-  if (msg.includes("open an atelier") || msg.includes("before listing")) {
-    return "Open your atelier before listing a piece.";
+  if (msg.includes("open an atelier") || msg.includes("before listing") || msg.includes("open a studio")) {
+    return "Open your studio before listing a piece.";
   }
   if (raw && raw.length < 140 && !msg.includes("error") && !msg.includes("exception")) return raw;
   return "Something went wrong. Please try again.";
