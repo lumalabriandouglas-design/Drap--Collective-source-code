@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Eye, EyeOff } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { HouseDoor } from "@/components/house-door";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,6 @@ export const Route = createFileRoute("/login")({ component: Login });
 
 function Login() {
   const navigate = useNavigate();
-  const emailRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -25,8 +24,8 @@ function Login() {
   const [hint, setHint] = useState<string | null>(null);
 
   useEffect(() => {
-    const t = window.setTimeout(() => emailRef.current?.focus(), 80);
-    return () => window.clearTimeout(t);
+    document.body.style.overflow = "";
+    document.body.style.pointerEvents = "";
   }, []);
 
   async function goToRoom(role?: FloorRole) {
@@ -86,30 +85,22 @@ function Login() {
   }
 
   return (
-    <main className="grid min-h-dvh lg:grid-cols-2">
+    <main className="relative z-20 grid min-h-dvh bg-ivory-50 lg:grid-cols-2">
       <HouseDoor line="Collectors and makers, same house — different rooms." />
-      <div className="flex items-center justify-center px-6 py-16">
+      <div className="relative z-20 flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-sm">
           <h1 className="font-serif text-3xl text-charcoal-800">Welcome back</h1>
           <p className="mt-2 text-sm text-charcoal-500">
-            Same email and password as odrapecollective.com. New here? Join as a collector or a designer.
+            Same email and password as the house. New here? Join as a collector or a designer.
           </p>
           <div className="gold-line my-6" />
 
           {authEnabled ? (
-            <form
-              onSubmit={(e) => void onEmail(e)}
-              className="grid gap-4"
-              onPointerDown={(e) => {
-                const el = e.target as HTMLElement | null;
-                if (el?.tagName === "INPUT") el.focus();
-              }}
-            >
+            <form onSubmit={(e) => void onEmail(e)} className="relative z-20 grid gap-4">
               <div>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="login-email">Email</Label>
                 <Input
-                  ref={emailRef}
-                  id="email"
+                  id="login-email"
                   name="email"
                   className="mt-1.5"
                   type="email"
@@ -118,24 +109,24 @@ function Login() {
                   autoCorrect="off"
                   spellCheck={false}
                   required
-                  autoComplete="email"
+                  autoComplete="username"
                   placeholder="you@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
               <div>
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="login-password">Password</Label>
                 <div className="relative mt-1.5">
                   <Input
-                    id="password"
+                    id="login-password"
                     name="password"
                     className="pr-12"
                     type={showPassword ? "text" : "password"}
                     required
                     minLength={6}
                     autoComplete="current-password"
-                    placeholder="••••••••"
+                    placeholder="Your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
@@ -143,7 +134,7 @@ function Login() {
                     type="button"
                     tabIndex={-1}
                     aria-label={showPassword ? "Hide password" : "Show password"}
-                    className="absolute top-1/2 right-3 -translate-y-1/2 text-charcoal-400 hover:text-charcoal-700"
+                    className="absolute top-1/2 right-1 z-20 grid size-11 -translate-y-1/2 place-items-center text-charcoal-400"
                     onClick={() => setShowPassword((v) => !v)}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -154,12 +145,9 @@ function Login() {
               <Button type="submit" className="w-full" disabled={busy}>
                 {busy ? "Please wait…" : "Sign in"}
               </Button>
-              <Link
-                to="/join"
-                className="w-full pt-1 text-center text-xs text-charcoal-500 hover:text-charcoal-800"
-              >
+              <a href="/join" className="w-full pt-1 text-center text-xs text-charcoal-500 hover:text-charcoal-800">
                 Need an account? Join the house
-              </Link>
+              </a>
             </form>
           ) : (
             <p className="text-sm text-charcoal-500">Sign-in is disabled.</p>
