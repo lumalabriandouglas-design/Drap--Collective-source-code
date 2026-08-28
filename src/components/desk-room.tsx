@@ -5,12 +5,14 @@ import { HouseRoom, RoomEmpty } from "@/components/house-room";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  deskDisplayText,
   deskOtherParty,
   deskUnread,
   getDeskThread,
   listDeskMessages,
   listDeskThreads,
   markDeskRead,
+  pullLiveDesk,
   replyDesk,
   subscribeDesk,
   type DeskMessage,
@@ -23,6 +25,23 @@ import { cn } from "@/lib/utils";
 function useDeskList(userId: string, isAdmin: boolean, aliases: string[]) {
   const [, setTick] = useState(0);
   useEffect(() => subscribeDesk(() => setTick((n) => n + 1)), []);
+  useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      try {
+        await pullLiveDesk();
+        if (alive) setTick((n) => n + 1);
+      } catch {
+        /* keep the local desk */
+      }
+    };
+    void run();
+    const timer = window.setInterval(() => void run(), 8000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [userId]);
   return listDeskThreads(userId, isAdmin, aliases);
 }
 
@@ -39,13 +58,15 @@ function timeLabel(iso: string) {
 function ThreadRow({
   thread,
   userId,
+  aliases,
   active,
 }: {
   thread: DeskThread;
   userId: string;
+  aliases: string[];
   active: boolean;
 }) {
-  const other = deskOtherParty(thread, userId);
+  const other = deskOtherParty(thread, userId, aliases);
   const unread = deskUnread(thread, userId);
   return (
     <Link
@@ -64,7 +85,7 @@ function ThreadRow({
       </div>
       <p className="mt-1 truncate text-sm font-light text-charcoal-500">
         {thread.pieceName ? `${thread.pieceName} · ` : ""}
-        {thread.lastPreview}
+        {deskDisplayText(thread.lastPreview)}
       </p>
       {unread ? (
         <span className="mt-2 inline-block h-1.5 w-1.5 rounded-full bg-charcoal-800" aria-label="Unread" />
@@ -108,7 +129,7 @@ export function DeskInbox({
       ) : (
         <div className="overflow-hidden rounded-2xl border border-charcoal-100 bg-ivory-50">
           {threads.map((thread) => (
-            <ThreadRow key={thread.id} thread={thread} userId={userId} active={false} />
+            <ThreadRow key={thread.id} thread={thread} userId={userId} aliases={aliases} active={false} />
           ))}
         </div>
       )}
@@ -160,7 +181,7 @@ export function DeskConversation({
     );
   }
 
-  const other = deskOtherParty(thread, userId);
+  const other = deskOtherParty(thread, userId, aliases);
 
   async function onReply(e: FormEvent) {
     e.preventDefault();
@@ -185,7 +206,13 @@ export function DeskConversation({
           </div>
           <div className="border-t border-charcoal-100">
             {threads.map((item) => (
-              <ThreadRow key={item.id} thread={item} userId={userId} active={item.id === threadId} />
+              <ThreadRow
+                key={item.id}
+                thread={item}
+                userId={userId}
+                aliases={aliases}
+                active={item.id === threadId || item.liveId === threadId}
+              />
             ))}
           </div>
         </aside>
@@ -214,7 +241,7 @@ export function DeskConversation({
 
           <div className="flex-1 space-y-4 overflow-y-auto px-4 py-6 sm:px-6">
             {messages.map((item) => (
-              <NoteBubble key={item.id} note={item} mine={item.senderId === userId} />
+              <NoteBubble key={item.id} note={item} mine={known.has(item.senderId)} />
             ))}
             <div ref={endRef} />
           </div>
@@ -245,11 +272,12 @@ export function DeskConversation({
 }
 
 function NoteBubble({ note, mine }: { note: DeskMessage; mine: boolean }) {
+  const body = deskDisplayText(note.content);
   if (note.kind === "house") {
     return (
       <div className="mx-auto max-w-md px-4 py-2 text-center">
         <p className="text-[10px] uppercase tracking-[0.16em] text-gold-600">Drapé</p>
-        <p className="mt-1 text-sm font-light text-pretty text-charcoal-500">{note.content}</p>
+        <p className="mt-1 text-sm font-light text-pretty text-charcoal-500">{body}</p>
       </div>
     );
   }
@@ -262,7 +290,7 @@ function NoteBubble({ note, mine }: { note: DeskMessage; mine: boolean }) {
         )}
       >
         <p className="text-[10px] uppercase tracking-[0.12em] opacity-70">{note.senderName}</p>
-        <p className="mt-1 whitespace-pre-wrap text-sm font-light leading-relaxed">{note.content}</p>
+        <p className="mt-1 whitespace-pre-wrap text-sm font-light leading-relaxed">{body}</p>
         <p className="mt-2 text-[10px] tabular-nums opacity-50">{timeLabel(note.createdAt)}</p>
       </div>
     </div>
