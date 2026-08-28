@@ -23,7 +23,7 @@ export function filterProducts(products: Product[], data: ProductFilter) {
     next = next.filter((p) => p.category === data.category);
   }
   if (data.atelier) {
-    next = next.filter((p) => p.designer.slug === data.atelier);
+    next = next.filter((p) => matchesSlug(p.designer.slug, data.atelier!));
   }
   if (data.q?.trim()) {
     const q = data.q.trim().toLowerCase();
@@ -41,10 +41,27 @@ export function filterProducts(products: Product[], data: ProductFilter) {
   return next.slice(0, limit);
 }
 
+function nameKey(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export function matchesSlug(actual: string, wanted: string) {
+  const have = actual.toLowerCase();
+  const need = wanted.toLowerCase();
+  if (have === need) return true;
+  if (have.startsWith(`${need}-`)) return true;
+  const tail = need.length >= 8 ? need.slice(-8) : "";
+  if (tail && have.endsWith(`-${tail}`)) return true;
+  return false;
+}
+
 export function designersOf(floor: Floor): Designer[] {
   const extra = new Map<string, Designer>();
   for (const product of floor.products) {
-    if (!floor.designers.some((d) => d.slug === product.designer.slug)) {
+    if (!floor.designers.some((d) => d.slug === product.designer.slug || d.userId === product.designer.userId)) {
       extra.set(product.designer.slug, {
         id: product.designer.id,
         slug: product.designer.slug,
@@ -55,7 +72,7 @@ export function designersOf(floor: Floor): Designer[] {
         philosophy: null,
         imageUrl: product.designer.imageUrl,
         featured: false,
-        userId: null,
+        userId: product.designer.userId,
         pieceCount: 0,
       });
     }
@@ -63,9 +80,11 @@ export function designersOf(floor: Floor): Designer[] {
   return [...floor.designers, ...extra.values()]
     .map((d) => ({
       ...d,
-      pieceCount: floor.products.filter((p) => p.designer.slug === d.slug).length,
+      pieceCount: floor.products.filter(
+        (p) => p.designer.slug === d.slug || (d.userId && p.designer.userId === d.userId),
+      ).length,
     }))
-    .sort((a, b) => Number(b.featured) - Number(a.featured) || b.pieceCount - a.pieceCount);
+    .sort((a, b) => Number(b.featured) - Number(a.featured) || b.pieceCount - a.pieceCount || a.name.localeCompare(b.name));
 }
 
 export function relatedOf(
@@ -75,20 +94,34 @@ export function relatedOf(
   return floor.products
     .filter(
       (p) =>
-        p.slug !== data.slug && (p.category === data.category || p.designer.slug === data.designerSlug),
+        p.slug !== data.slug && (p.category === data.category || matchesSlug(p.designer.slug, data.designerSlug)),
     )
     .slice(0, 4);
 }
 
 export function designerOf(floor: Floor, slug: string) {
-  const pieces = floor.products.filter((p) => p.designer.slug === slug);
-  const listed = floor.designers.find((d) => d.slug === slug);
+  const wanted = slug.toLowerCase();
+  const listed =
+    floor.designers.find((d) => d.slug.toLowerCase() === wanted) ??
+    floor.designers.find((d) => matchesSlug(d.slug, wanted)) ??
+    floor.designers.find((d) => nameKey(d.name) === wanted) ??
+    floor.designers.find((d) => d.userId?.startsWith(wanted.slice(-8)));
+  const pieces = floor.products.filter((p) => {
+    if (listed) {
+      return (
+        p.designer.slug === listed.slug ||
+        (listed.userId && p.designer.userId === listed.userId) ||
+        (listed.authId && p.listedBy === listed.authId)
+      );
+    }
+    return matchesSlug(p.designer.slug, wanted);
+  });
   if (!listed && pieces.length === 0) return null;
   const designer: Designer = listed
     ? { ...listed, pieceCount: pieces.length }
     : {
         id: pieces[0].designer.id,
-        slug,
+        slug: pieces[0].designer.slug,
         name: pieces[0].designer.name,
         city: pieces[0].designer.city,
         country: pieces[0].designer.country,
@@ -96,7 +129,7 @@ export function designerOf(floor: Floor, slug: string) {
         philosophy: null,
         imageUrl: pieces[0].designer.imageUrl,
         featured: false,
-        userId: null,
+        userId: pieces[0].designer.userId,
         pieceCount: pieces.length,
       };
   return { designer, pieces };
