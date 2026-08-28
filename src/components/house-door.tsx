@@ -8,7 +8,7 @@ export function HouseDoor({ line }: { line: string }) {
   const src = DOORS[index];
 
   return (
-    <div className="relative hidden min-h-dvh overflow-hidden bg-charcoal-900 lg:block">
+    <div className="relative hidden min-h-dvh overflow-hidden bg-charcoal-900 max-lg:hidden lg:block">
       {src ? (
         <img
           src={src}
