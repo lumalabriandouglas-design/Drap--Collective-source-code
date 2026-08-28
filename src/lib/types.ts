@@ -15,6 +15,7 @@ export type Designer = {
 
 export type Product = {
   id: number;
+  recordId?: string;
   slug: string;
   name: string;
   description: string;
@@ -26,6 +27,7 @@ export type Product = {
   tags: string[];
   leadTime: string | null;
   featured: boolean;
+  hidden?: boolean;
   listedBy: string | null;
   designer: Pick<Designer, "id" | "slug" | "name" | "city" | "country" | "imageUrl" | "userId">;
 };
@@ -69,4 +71,5 @@ export type AtelierProfile = {
   country: string;
   bio: string;
   imageUrl?: string | null;
+  recordId?: string;
 };

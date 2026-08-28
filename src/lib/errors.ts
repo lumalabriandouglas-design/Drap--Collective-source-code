@@ -40,7 +40,7 @@ export function houseError(err: unknown): string {
   }
   if (msg.includes("too large")) return "That photograph is still too large after compression.";
   if (msg.includes("not connected") || msg.includes("r2")) {
-    return "Photo storage is not fully connected yet. The listing can still wait in the preview.";
+    return "Photo storage is not connected yet. Publish needs Cloudflare so the picture stays on the house.";
   }
   if (msg.includes("open an atelier") || msg.includes("before listing")) {
     return "Open your atelier before listing a piece.";
