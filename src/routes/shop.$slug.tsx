@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Heart, MessageCircle } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Price } from "@/components/price";
 import { ProductGrid } from "@/components/product-card";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useBag } from "@/lib/bag-store";
 import { getProduct, listRelated } from "@/lib/catalog";
-import { sendInquiry, toggleWishlist } from "@/lib/commerce";
+import { listWishlist, sendInquiry, toggleWishlist } from "@/lib/commerce";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
 export const Route = createFileRoute("/shop/$slug")({ component: ProductPage });
@@ -45,6 +45,13 @@ function ProductPage() {
   const images = product?.imageUrls?.length
     ? product.imageUrls
     : ["/images/products/studio-2.jpg"];
+
+  useEffect(() => {
+    if (!user || !product) return;
+    void listWishlist().then((rows) => {
+      setSaved(rows.some((row) => row.product_id === product.id));
+    });
+  }, [user, product?.id]);
 
   const selectedSize = useMemo(() => {
     if (size) return size;
