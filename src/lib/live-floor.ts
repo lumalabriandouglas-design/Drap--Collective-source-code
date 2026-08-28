@@ -49,18 +49,26 @@ export type Floor = {
 const CACHE_MS = 45_000;
 let cache: { at: number; floor: Floor } | null = null;
 
+const HOUSE_NAMES: Record<string, string> = {
+  "house of zion": "House of Zion",
+  "tassy stitches": "Tassy Stitches",
+  "ensemble fashions": "Ensemble Fashions",
+  "ucj fashions": "UCJ Fashions",
+  "may stitches": "May Stitches",
+};
+
 function numericId(uuid: string): number {
   const n = Number.parseInt(uuid.replace(/-/g, "").slice(0, 7), 16);
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
-function slugify(value: string, id: string) {
-  const base = value
+export function showroomSlug(name: string, id: string) {
+  const base = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 42);
-  return `${base || "piece"}-${id.slice(0, 8)}`;
+  return `${base || "atelier"}-${id.slice(0, 8)}`;
 }
 
 function titleCase(value: string) {
@@ -92,14 +100,8 @@ function kampalaLocation(raw: string | null): { city: string; country: string } 
 function designerName(profile: RawProfile): string {
   const brand = profile.brand_name?.trim();
   if (brand) {
-    const pretty: Record<string, string> = {
-      "house of zion": "House of Zion",
-      "tassy stitches": "Tassy Stitches",
-      "ensemble fashions": "Ensemble Fashions",
-      "ucj fashions": "UCJ Fashions",
-      "may stitches": "May Stitches",
-    };
-    return pretty[brand.toLowerCase()] ?? brand.replace(/\s+/g, " ");
+    const key = brand.replace(/\s+/g, " ").toLowerCase();
+    return HOUSE_NAMES[key] ?? brand.replace(/\s+/g, " ");
   }
   if (profile.username?.trim()) return profile.username.trim();
   return "Independent Designer";
@@ -209,6 +211,11 @@ function buildLookbooks(products: Product[], designers: Designer[]): Lookbook[] 
   return stories;
 }
 
+function ownsPiece(profile: RawProfile, product: RawProduct) {
+  if (!product.user_id) return false;
+  return product.user_id === profile.id || Boolean(profile.user_id && product.user_id === profile.user_id);
+}
+
 export async function loadFloor(force = false): Promise<Floor> {
   if (!force && cache && Date.now() - cache.at < CACHE_MS) return cache.floor;
 
@@ -219,30 +226,32 @@ export async function loadFloor(force = false): Promise<Floor> {
     ),
   ]);
 
-  const profiles = rawProfiles.filter((p) => !p.is_suspended && p.role === "designer");
+  const profiles = rawProfiles.filter((p) => !p.is_suspended);
   const published = rawProducts.filter(
     (p) => p.status === "published" && !p.is_hidden && !p.is_deleted && (p.image_urls?.length ?? 0) > 0,
   );
 
   const designerIds = new Set(published.map((p) => p.user_id).filter(Boolean) as string[]);
   const activeProfiles = profiles.filter(
-    (p) => designerIds.has(p.id) || Boolean(p.brand_name?.trim()),
+    (p) =>
+      p.role === "designer" ||
+      Boolean(p.brand_name?.trim()) ||
+      designerIds.has(p.id) ||
+      Boolean(p.user_id && designerIds.has(p.user_id)),
   );
 
   const designers: Designer[] = activeProfiles.map((profile) => {
     const name = designerName(profile);
     const { city, country } = kampalaLocation(profile.location);
-    const pieces = published.filter((p) => p.user_id === profile.id);
+    const pieces = published.filter((p) => ownsPiece(profile, p));
     const cover =
       pieces[0]?.image_urls?.[0] ||
       profile.profile_photo_url ||
       "/images/products/studio-2.jpg";
+    const slugName = name === "Independent Designer" ? `atelier-${profile.id.slice(0, 6)}` : name;
     return {
       id: numericId(profile.id),
-      slug: slugify(
-        name === "Independent Designer" ? `atelier-${profile.id.slice(0, 6)}` : name,
-        profile.id,
-      ),
+      slug: showroomSlug(slugName, profile.id),
       name,
       city,
       country,
@@ -256,7 +265,11 @@ export async function loadFloor(force = false): Promise<Floor> {
     };
   });
 
-  const designerByUser = new Map(designers.map((d) => [d.userId, d]));
+  const designerByUser = new Map<string, Designer>();
+  for (const designer of designers) {
+    if (designer.userId) designerByUser.set(designer.userId, designer);
+    if (designer.authId) designerByUser.set(designer.authId, designer);
+  }
 
   const products: Product[] = published.map((row) => {
     const house = row.user_id ? designerByUser.get(row.user_id) : undefined;
@@ -281,7 +294,8 @@ export async function loadFloor(force = false): Promise<Floor> {
       `Listed by ${designer.name}${designer.city ? `, ${designer.city}` : ""}. Inquire for measurements, cloth, and finish.`;
     return {
       id: numericId(row.id),
-      slug: slugify(name, row.id),
+      recordId: row.id,
+      slug: showroomSlug(name, row.id),
       name,
       description,
       category,
@@ -301,7 +315,7 @@ export async function loadFloor(force = false): Promise<Floor> {
   const floor: Floor = {
     products,
     designers: designers.sort(
-      (a, b) => Number(b.featured) - Number(a.featured) || b.pieceCount - a.pieceCount,
+      (a, b) => Number(b.featured) - Number(a.featured) || b.pieceCount - a.pieceCount || a.name.localeCompare(b.name),
     ),
     lookbooks,
   };
