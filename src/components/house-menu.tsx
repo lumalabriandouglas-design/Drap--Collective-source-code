@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
   ChevronDown,
@@ -8,6 +9,7 @@ import {
   MessageSquare,
   Moon,
   Settings,
+  Share2,
   Store,
   Sun,
   UserPlus,
@@ -23,6 +25,7 @@ import { CURRENCIES, type CurrencyCode } from "@/lib/format";
 import { clearFloorSession } from "@/lib/floor-auth";
 import { displayImage } from "@/lib/media";
 import { readTheme, toggleTheme } from "@/lib/theme";
+import { getMyStudio } from "@/lib/studio";
 import { useHouseRole } from "@/lib/use-role";
 import { cn } from "@/lib/utils";
 
@@ -74,6 +77,11 @@ function nextCurrency(code: CurrencyCode): CurrencyCode {
 export function HouseAccountPanel({ onDone }: { onDone?: () => void }) {
   const { user } = useCurrentUserState();
   const { isDesigner, isAdmin } = useHouseRole();
+  const studio = useQuery({
+    queryKey: ["studio"],
+    enabled: Boolean(user) && isDesigner,
+    queryFn: () => getMyStudio(),
+  });
   const currency = useCurrency((s) => s.currency);
   const setCurrency = useCurrency((s) => s.setCurrency);
   const [theme, setThemeState] = useState(readTheme);
@@ -102,10 +110,18 @@ export function HouseAccountPanel({ onDone }: { onDone?: () => void }) {
             Account
           </Link>
           {isDesigner ? (
-            <Link to="/studio" className={rowClass} onClick={onDone}>
-              <Store size={15} />
-              Studio
-            </Link>
+            <>
+              <Link to="/studio" className={rowClass} onClick={onDone}>
+                <Store size={15} />
+                Studio
+              </Link>
+              {studio.data?.atelier?.slug ? (
+                <Link to="/s/$slug" params={{ slug: studio.data.atelier.slug }} className={rowClass} onClick={onDone}>
+                  <Share2 size={15} />
+                  Showroom
+                </Link>
+              ) : null}
+            </>
           ) : null}
           <Link to="/desk" className={rowClass} onClick={onDone}>
             <MessageSquare size={15} />
@@ -123,14 +139,14 @@ export function HouseAccountPanel({ onDone }: { onDone?: () => void }) {
           <p className="px-4 pb-2 pt-3 text-[10px] font-medium uppercase tracking-[0.16em] text-gold-600">
             The house
           </p>
-          <Link to="/login" className={rowClass} onClick={onDone}>
+          <a href="/login" className={rowClass} onClick={onDone}>
             <LogIn size={15} />
             Sign in
-          </Link>
-          <Link to="/join" className={rowClass} onClick={onDone}>
+          </a>
+          <a href="/join" className={rowClass} onClick={onDone}>
             <UserPlus size={15} />
             Join
-          </Link>
+          </a>
         </>
       )}
       <div className="mx-4 my-2 h-px bg-charcoal-100" />
