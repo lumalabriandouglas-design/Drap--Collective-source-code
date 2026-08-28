@@ -160,7 +160,7 @@ function NewPiece() {
         setNote(
           uploaded.backend === "r2"
             ? `On Cloudflare · ${formatBytes(result.compressedSize)}`
-            : `Saved on this preview · ${formatBytes(result.compressedSize)} · ${result.width}×${result.height}`,
+            : `Saved to the house · ${formatBytes(result.compressedSize)} · ${result.width}×${result.height}`,
         );
       }
     } catch (err) {
@@ -190,7 +190,7 @@ function NewPiece() {
         ? await updatePiece({ data: { ...payload, slug: edit } })
         : await listPiece({ data: payload });
       clearListingDraft();
-      toast.success(edit ? "Piece updated on this preview" : "Listed on this preview");
+      toast.success(edit ? "Piece updated on the floor" : "Listed on the floor");
       await client.invalidateQueries({ queryKey: ["studio"] });
       await client.invalidateQueries({ queryKey: ["products"] });
       await client.invalidateQueries({ queryKey: ["designers"] });
@@ -213,7 +213,7 @@ function NewPiece() {
       lede={
         storage.data?.r2
           ? "Up to five photographs. They go to Cloudflare — the house only keeps your account."
-          : "Up to five photographs. If Cloudflare is still connecting, the picture stays on this preview so you can finish the listing."
+          : "Up to five photographs. They are stored with the house. Cloudflare stays behind the drapes until its keys are set."
       }
       actions={
         <Button asChild variant="outline">
@@ -362,7 +362,7 @@ function NewPiece() {
           </div>
         </div>
         <Button type="submit" disabled={busy}>
-          {busy ? (edit ? "Saving…" : "Listing…") : edit ? "Save changes" : "List on this preview"}
+          {busy ? (edit ? "Saving…" : "Publishing…") : edit ? "Save changes" : "List this piece"}
         </Button>
       </form>
     </HouseRoom>
