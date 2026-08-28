@@ -1,11 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Eye, EyeOff, Palette, User } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
+import { HouseDoor } from "@/components/house-door";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Wordmark } from "@/components/wordmark";
 import { houseError } from "@/lib/errors";
 import { floorSignUp, type FloorRole } from "@/lib/floor-auth";
 import { pathForRole } from "@/lib/use-role";
@@ -13,16 +13,16 @@ import { pathForRole } from "@/lib/use-role";
 type Door = "client" | "designer";
 
 export const Route = createFileRoute("/join")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    as: search.as === "designer" || search.as === "client" ? (search.as as Door) : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { as?: Door } => {
+    if (search.as === "designer" || search.as === "client") return { as: search.as };
+    return {};
+  },
   component: Join,
 });
 
 function Join() {
   const navigate = useNavigate();
   const { as } = Route.useSearch();
-  const nameRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<"door" | "details">(as ? "details" : "door");
   const [door, setDoor] = useState<Door>(as ?? "client");
   const [name, setName] = useState("");
@@ -33,10 +33,9 @@ function Join() {
   const [hint, setHint] = useState<string | null>(null);
 
   useEffect(() => {
-    if (step !== "details") return;
-    const t = window.setTimeout(() => nameRef.current?.focus(), 80);
-    return () => window.clearTimeout(t);
-  }, [step]);
+    document.body.style.overflow = "";
+    document.body.style.pointerEvents = "";
+  }, []);
 
   function choose(next: Door) {
     setDoor(next);
@@ -50,7 +49,7 @@ function Join() {
     setHint(null);
     try {
       const session = await floorSignUp({ email, password, name, door });
-      toast.success(door === "designer" ? "Now open your studio and add a piece" : "Welcome");
+      toast.success(door === "designer" ? "Now open your atelier — that is the door you send to clients" : "Welcome to the house");
       const dest = pathForRole(session.role as FloorRole);
       if (dest === "/studio") await navigate({ to: "/studio" });
       else await navigate({ to: "/account" });
@@ -62,33 +61,23 @@ function Join() {
   }
 
   return (
-    <main className="grid min-h-dvh lg:grid-cols-2">
-      <div className="relative hidden overflow-hidden bg-charcoal-900 lg:block">
-        <img
-          src="/images/hero-2.jpg"
-          alt=""
-          className="absolute inset-0 size-full object-cover opacity-80"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-          }}
-        />
-        <div className="absolute inset-0 bg-charcoal-900/40" />
-        <div className="relative flex h-full flex-col justify-end p-12">
-          <Wordmark light className="text-3xl" />
-          <p className="mt-4 max-w-sm font-serif text-2xl italic text-ivory-50">
-            {door === "designer" ? "Show your work. People write to you here." : "Find original clothes. Write to the maker."}
-          </p>
-        </div>
-      </div>
+    <main className="relative z-20 grid min-h-dvh bg-ivory-50 lg:grid-cols-2">
+      <HouseDoor
+        line={
+          door === "designer"
+            ? "Open an atelier. Collectors meet you in the house."
+            : "Collect original cloth. The house keeps the relationship."
+        }
+      />
       <div className="flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-sm">
-          <h1 className="font-serif text-3xl text-charcoal-800">Join</h1>
+          <h1 className="font-serif text-3xl text-charcoal-800">Join the house</h1>
           <p className="mt-2 text-sm text-charcoal-500">
             {step === "door"
-              ? "Buy clothes, or sell the clothes you make."
+              ? "A collector’s account, or an atelier. One minute."
               : door === "designer"
-                ? "You are joining as a designer."
-                : "You are joining as a buyer."}
+                ? "Joining as a designer. You can list work after this."
+                : "Joining as a collector. Heart pieces, write to ateliers, commission through the house."}
           </p>
           <div className="gold-line my-6" />
 
@@ -100,8 +89,8 @@ function Join() {
                 className="rounded-2xl border border-charcoal-100 bg-ivory-50 p-5 text-left transition-colors hover:border-charcoal-300"
               >
                 <User size={18} className="text-charcoal-700" />
-                <p className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-charcoal-800">Buyer</p>
-                <p className="mt-1 text-sm font-light text-charcoal-500">Shop and message designers.</p>
+                <p className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-charcoal-800">Collector</p>
+                <p className="mt-1 text-sm font-light text-charcoal-500">Discover and keep original pieces.</p>
               </button>
               <button
                 type="button"
@@ -110,24 +99,17 @@ function Join() {
               >
                 <Palette size={18} className="text-charcoal-700" />
                 <p className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-charcoal-800">Designer</p>
-                <p className="mt-1 text-sm font-light text-charcoal-500">Open a studio and list your work.</p>
+                <p className="mt-1 text-sm font-light text-charcoal-500">Open an atelier and list your cloth.</p>
               </button>
               <p className="pt-4 text-center text-xs text-charcoal-500">
-                Already have an account?{" "}
+                Already in the house?{" "}
                 <Link to="/login" className="text-charcoal-800 hover:underline">
                   Sign in
                 </Link>
               </p>
             </div>
           ) : (
-            <form
-              onSubmit={(e) => void onSubmit(e)}
-              className="grid gap-4"
-              onPointerDown={(e) => {
-                const el = e.target as HTMLElement | null;
-                if (el?.tagName === "INPUT") el.focus();
-              }}
-            >
+            <form onSubmit={(e) => void onSubmit(e)} className="relative z-20 grid gap-4">
               <button
                 type="button"
                 className="flex items-center gap-1.5 text-xs text-charcoal-400 hover:text-charcoal-700"
@@ -137,12 +119,11 @@ function Join() {
                 }}
               >
                 <ArrowLeft size={14} />
-                {door === "designer" ? "Designer" : "Buyer"}
+                {door === "designer" ? "Designer" : "Collector"}
               </button>
               <div>
-                <Label htmlFor="name">{door === "designer" ? "Brand name" : "Your name"}</Label>
+                <Label htmlFor="name">{door === "designer" ? "Atelier name" : "Your name"}</Label>
                 <Input
-                  ref={nameRef}
                   id="name"
                   name="name"
                   className="mt-1.5"
@@ -182,7 +163,7 @@ function Join() {
                     required
                     minLength={8}
                     autoComplete="new-password"
-                    placeholder="At least 8 letters"
+                    placeholder="At least 8 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
@@ -199,10 +180,10 @@ function Join() {
               </div>
               {hint && <p className="text-sm text-destructive">{hint}</p>}
               <Button type="submit" className="w-full" disabled={busy}>
-                {busy ? "Please wait…" : door === "designer" ? "Create designer account" : "Create buyer account"}
+                {busy ? "Opening the door…" : door === "designer" ? "Create designer account" : "Create collector account"}
               </Button>
               <p className="text-center text-xs text-charcoal-500">
-                Already have an account?{" "}
+                Already in the house?{" "}
                 <Link to="/login" className="text-charcoal-800 hover:underline">
                   Sign in
                 </Link>
@@ -211,7 +192,7 @@ function Join() {
           )}
           <p className="mt-8 text-center text-xs text-charcoal-400">
             <Link to="/" className="hover:text-charcoal-700">
-              Back home
+              Back to the house
             </Link>
           </p>
         </div>
