@@ -55,9 +55,11 @@ export const getMyStudioRpc = createServerFn({ method: "GET" })
         city: atelier.city,
         country: atelier.country,
         bio: atelier.bio,
+        imageUrl: null,
       },
       pieces: pieces.map((row) => ({
         id: Number(row.id),
+        recordId: String(row.id),
         slug: row.slug,
         name: row.name,
         description: row.description,
@@ -77,6 +79,7 @@ export const getMyStudioRpc = createServerFn({ method: "GET" })
           city: atelier.city,
           country: atelier.country,
           imageUrl: "",
+          userId: context.userId,
         },
       })),
     };

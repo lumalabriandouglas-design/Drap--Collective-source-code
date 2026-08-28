@@ -95,9 +95,7 @@ function AtelierHouse() {
       <p className="mt-3 text-xs text-charcoal-400">
         {visits.isFetching
           ? "Updating visits…"
-          : visits.data?.live
-            ? "Visit count updates when someone opens a page."
-            : "Visit count on this preview. It updates each time a page opens."}
+          : "Visit count updates when someone opens a page."}
       </p>
 
       <section className="mt-14">

@@ -55,7 +55,7 @@ export function ShowroomShareCard({
     try {
       await copyShowroomLink(slug);
       setCopied(true);
-      toast.success("Link copied");
+      toast.success("Showroom link copied");
       window.setTimeout(() => setCopied(false), 2200);
     } catch (err) {
       toast.message(err instanceof Error ? err.message : href);
@@ -64,10 +64,10 @@ export function ShowroomShareCard({
 
   return (
     <div className="rounded-2xl border border-charcoal-100 bg-ivory-50 p-5 sm:p-6">
-      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gold-600">Your page</p>
+      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gold-600">Your showroom</p>
       <p className="mt-2 font-serif text-2xl text-charcoal-800">{name}</p>
       <p className="mt-2 text-sm font-light leading-relaxed text-charcoal-500">
-        Send this link. People see only your clothes.
+        Send this to your clients so they only see your work — not the whole house.
       </p>
       <p className="mt-4 break-all text-xs tracking-wide text-charcoal-400">{display}</p>
       <div className="mt-4 flex flex-wrap gap-2">
@@ -77,7 +77,7 @@ export function ShowroomShareCard({
         </Button>
         <Button asChild variant="outline">
           <Link to="/s/$slug" params={{ slug }}>
-            Open page
+            Open showroom
           </Link>
         </Button>
       </div>
@@ -103,7 +103,7 @@ export function DesignerShowroom({
   async function share() {
     const payload = {
       title: `${designer.name} — Drapé Collective`,
-      text: `${designer.name} on Drapé Collective.`,
+      text: `The ${designer.name} showroom on Drapé Collective.`,
       url: shareUrl,
     };
     try {
@@ -112,7 +112,7 @@ export function DesignerShowroom({
         return;
       }
     } catch {
-      /* copy */
+      /* fall through to copy */
     }
     try {
       if (navigator.clipboard?.writeText) {
@@ -129,7 +129,7 @@ export function DesignerShowroom({
         field.remove();
       }
       setCopied(true);
-      toast.success("Link copied");
+      toast.success("Showroom link copied");
       window.setTimeout(() => setCopied(false), 2200);
     } catch {
       toast.message(shareUrl);
@@ -165,17 +165,21 @@ export function DesignerShowroom({
             <MapPin size={12} />
             {designer.city}, {designer.country}
           </p>
-          <h1 className="mt-3 font-serif text-5xl text-ivory-50 sm:text-6xl lg:text-7xl">{designer.name}</h1>
-          <p className="mt-4 max-w-xl text-sm font-light leading-relaxed text-ivory-100/80">{designer.bio}</p>
+          <h1 className="mt-3 font-serif text-5xl text-ivory-50 sm:text-6xl lg:text-7xl">
+            {designer.name}
+          </h1>
+          <p className="mt-4 max-w-xl text-sm font-light leading-relaxed text-ivory-100/80">
+            {designer.bio}
+          </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button type="button" variant="light" size="lg" onClick={() => void share()}>
               {copied ? <Check size={16} /> : <Share2 size={16} />}
-              {copied ? "Link copied" : "Share page"}
+              {copied ? "Link copied" : "Share showroom"}
             </Button>
             {hero && (
               <Button asChild size="lg" variant="outline" className="border-ivory-50/50 text-ivory-50 hover:bg-ivory-50 hover:text-charcoal-800">
                 <Link to="/shop/$slug" params={{ slug: hero.slug }}>
-                  Message
+                  Write to the atelier
                 </Link>
               </Button>
             )}
@@ -186,20 +190,22 @@ export function DesignerShowroom({
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">Clothes</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">
+              Private showroom
+            </p>
             <h2 className="mt-2 font-serif text-3xl text-charcoal-800">The collection</h2>
           </div>
           <p className="text-xs uppercase tracking-[0.14em] text-charcoal-400">
-            {pieces.length} {pieces.length === 1 ? "piece" : "pieces"}
+            {pieces.length} {pieces.length === 1 ? "piece" : "pieces"} · {shareUrl.replace(/^https?:\/\//, "")}
           </p>
         </div>
         <div className="gold-line my-8" />
 
         {pieces.length === 0 ? (
           <div className="rounded-2xl border border-charcoal-100 bg-ivory-50 px-6 py-14 text-center">
-            <p className="font-serif text-2xl text-charcoal-800">No pieces yet</p>
+            <p className="font-serif text-2xl text-charcoal-800">This showroom is open</p>
             <p className="mx-auto mt-3 max-w-md text-sm font-light leading-relaxed text-charcoal-500">
-              {designer.name} has not listed a piece yet. This page is still theirs.
+              {designer.name} has not listed a piece yet. The link still belongs to this atelier — clients who open it land here, not in the shop.
             </p>
           </div>
         ) : (
@@ -212,7 +218,10 @@ export function DesignerShowroom({
                   to="/shop/$slug"
                   params={{ slug: piece.slug }}
                   onMouseEnter={() => setActive(i)}
-                  className={cn("group block", featured ? "md:col-span-7" : "md:col-span-5")}
+                  className={cn(
+                    "group block",
+                    featured ? "md:col-span-7" : "md:col-span-5",
+                  )}
                 >
                   <LazyImage
                     src={piece.imageUrls[0] ?? designer.imageUrl}
@@ -225,7 +234,10 @@ export function DesignerShowroom({
                   <div className="mt-4 flex items-start justify-between gap-4">
                     <div>
                       <h3 className="font-serif text-2xl text-charcoal-800">{piece.name}</h3>
-                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-charcoal-400">{piece.category}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-charcoal-400">
+                        {piece.category}
+                        {piece.leadTime ? ` · ${piece.leadTime}` : ""}
+                      </p>
                     </div>
                     <Price cents={piece.priceCents} className="text-sm text-charcoal-700" />
                   </div>

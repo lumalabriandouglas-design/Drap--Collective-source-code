@@ -54,6 +54,13 @@ function Account() {
               <Link to="/studio">{studio.data?.atelier ? "Your atelier" : "Open an atelier"}</Link>
             </Button>
           )}
+          {isDesigner && studio.data?.atelier?.slug ? (
+            <Button asChild variant="outline">
+              <Link to="/s/$slug" params={{ slug: studio.data.atelier.slug }}>
+                Showroom
+              </Link>
+            </Button>
+          ) : null}
           {!isDesigner && (
             <Button asChild variant="outline">
               <Link to="/studio">Sell with Drapé</Link>
@@ -181,21 +188,35 @@ function Account() {
         ) : (
           <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 lg:grid-cols-4">
             {savedList.map((item) => (
-              <Link key={item.id} to="/shop/$slug" params={{ slug: item.slug }} className="group block">
-                <LazyImage
-                  src={item.image || "/images/products/studio-2.jpg"}
-                  alt={item.name}
-                  className="aspect-portrait rounded-xl"
-                  imgClassName="transition-transform duration-700 ease-out group-hover:scale-[1.04]"
-                />
-                <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.1em] text-charcoal-400">
-                  {item.designer_name}
-                </p>
-                <p className="font-serif text-[15px] text-charcoal-800 group-hover:text-charcoal-600">
-                  {item.name}
-                </p>
-                <Price cents={Number(item.price_cents)} className="mt-1.5 block text-sm text-charcoal-700" />
-              </Link>
+              <article key={item.id}>
+                <Link to="/shop/$slug" params={{ slug: item.slug }} className="group block">
+                  <LazyImage
+                    src={item.image || "/images/products/studio-2.jpg"}
+                    alt={item.name}
+                    className="aspect-portrait rounded-xl"
+                    imgClassName="transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                  />
+                </Link>
+                {item.designer_slug ? (
+                  <Link
+                    to="/s/$slug"
+                    params={{ slug: item.designer_slug }}
+                    className="mt-3 block text-[11px] font-medium uppercase tracking-[0.1em] text-charcoal-400 hover:text-gold-600"
+                  >
+                    {item.designer_name}
+                  </Link>
+                ) : (
+                  <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.1em] text-charcoal-400">
+                    {item.designer_name}
+                  </p>
+                )}
+                <Link to="/shop/$slug" params={{ slug: item.slug }} className="group block">
+                  <p className="font-serif text-[15px] text-charcoal-800 group-hover:text-charcoal-600">
+                    {item.name}
+                  </p>
+                  <Price cents={Number(item.price_cents)} className="mt-1.5 block text-sm text-charcoal-700" />
+                </Link>
+              </article>
             ))}
           </div>
         )}

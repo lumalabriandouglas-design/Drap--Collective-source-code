@@ -16,6 +16,8 @@ const SUPABASE_URL = "https://fpvbhlbqojxrgnvxpcng.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdmJobGJxb2p4cmdudnhwY25nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2ODk4ODYsImV4cCI6MjA5NjI2NTg4Nn0.MHQq6Sq3xLyLxE3ZqcNW9_5k4knMKB4fp7vH7Ja-Ees";
 
+export type StudioState = { atelier: AtelierProfile | null; pieces: Product[] };
+
 function sameHouse(left: string | null | undefined, right: string | null | undefined) {
   if (!left || !right) return false;
   return left.toLowerCase().trim() === right.toLowerCase().trim();
@@ -48,14 +50,20 @@ function atelierFromSession(): AtelierProfile | null {
   };
 }
 
-async function studioFromFloor(): Promise<{ atelier: AtelierProfile | null; pieces: Product[] }> {
+async function studioFromFloor(): Promise<StudioState> {
   const session = getFloorSession();
   if (!session) return { atelier: null, pieces: [] };
 
   const floor = await liveFloor();
   const livePieces = floor.products.filter((p) => owns(p, session));
   const designer =
-    floor.designers.find((d) => d.userId === session.profileId || d.userId === session.userId) ??
+    floor.designers.find(
+      (d) =>
+        d.userId === session.profileId ||
+        d.userId === session.userId ||
+        d.authId === session.userId ||
+        d.authId === session.profileId,
+    ) ??
     floor.designers.find((d) => sameHouse(d.name, session.brandName) || sameHouse(d.name, session.displayName)) ??
     (livePieces[0] ? floor.designers.find((d) => d.slug === livePieces[0].designer.slug) : undefined);
 
@@ -85,12 +93,12 @@ async function studioFromFloor(): Promise<{ atelier: AtelierProfile | null; piec
   }
 }
 
-export async function getMyStudio() {
+export async function getMyStudio(): Promise<StudioState> {
   if (getFloorSession()) return studioFromFloor();
   if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
     try {
       const { getMyStudioRpc } = await import("@/lib/studio-rpc");
-      return await getMyStudioRpc();
+      return (await getMyStudioRpc()) as StudioState;
     } catch {
       /* floor */
     }
@@ -98,11 +106,18 @@ export async function getMyStudio() {
   return studioFromFloor();
 }
 
+function pieceRecordId(row: Product) {
+  return row.recordId ?? "";
+}
+
 export async function getOwnedPiece(slug: string): Promise<Product | null> {
   const studio = await getMyStudio();
+  const tail = slug.slice(-8);
   return (
-    studio.pieces.find((row) => row.slug === slug || row.recordId === slug || row.recordId?.startsWith(slug.slice(-8))) ??
-    null
+    studio.pieces.find((row) => {
+      const recordId = pieceRecordId(row);
+      return row.slug === slug || recordId === slug || (Boolean(recordId) && recordId.startsWith(tail));
+    }) ?? null
   );
 }
 

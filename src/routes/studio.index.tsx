@@ -13,13 +13,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { ATELIER_BIO_MAX } from "@/lib/constants";
 import { houseError } from "@/lib/errors";
-import { isHiddenPiece, isPreviewPiece } from "@/lib/preview-rail";
 import { claimRole } from "@/lib/roles";
 import { deletePiece, getMyStudio, hidePiece, openAtelier, unhidePiece } from "@/lib/studio";
 import type { Product } from "@/lib/types";
 import { useHouseRole } from "@/lib/use-role";
 
 export const Route = createFileRoute("/studio/")({ component: Studio });
+
+function pieceIsHidden(piece: Product) {
+  return Boolean(piece.hidden) || piece.tags.includes("hidden");
+}
 
 function Studio() {
   const { user, isPending, isDesigner, isAdmin } = useHouseRole();
@@ -58,8 +61,8 @@ function Studio() {
   const atelier = studio.data?.atelier;
   const pieces = studio.data?.pieces ?? [];
   const cover = atelier?.imageUrl || pieces[0]?.imageUrls[0] || "/images/products/studio-2.jpg";
-  const previewPieces = pieces.filter(isPreviewPiece);
-  const livePieces = pieces.filter((piece) => !isPreviewPiece(piece));
+  const hiddenPieces = pieces.filter(pieceIsHidden);
+  const livePieces = pieces.filter((piece) => !pieceIsHidden(piece));
 
   async function onOpen(e: FormEvent) {
     e.preventDefault();
@@ -67,7 +70,7 @@ function Studio() {
     try {
       await openAtelier({ data: form });
       await claimRole({ data: { role: "designer" } });
-      toast.success("Your page is open. Copy the link for your clients.");
+      toast.success("Your showroom is open. Copy the link for your clients.");
       await client.invalidateQueries({ queryKey: ["studio"] });
       await client.invalidateQueries({ queryKey: ["designers"] });
       await client.invalidateQueries({ queryKey: ["house-role"] });
@@ -81,27 +84,27 @@ function Studio() {
   if (!atelier) {
     return (
       <HouseRoom
-        eyebrow="Studio"
-        title="Open your studio"
-        lede="Add your name and a short note. Then you can list clothes and send people your page."
+        eyebrow="Designer studio"
+        title="Open an atelier"
+        lede="List original work with Drapé. Collectors meet the house; the house keeps the relationship."
         actions={
           isAdmin ? (
             <Button asChild variant="outline">
-              <Link to="/atelier-house">Admin</Link>
+              <Link to="/atelier-house">House ledger</Link>
             </Button>
           ) : (
             <Button asChild variant="outline">
-              <Link to="/account">Account</Link>
+              <Link to="/account">Your account</Link>
             </Button>
           )
         }
       >
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start">
           <form onSubmit={(e) => void onOpen(e)} className="rounded-2xl border border-charcoal-100 bg-ivory-50 p-6 sm:p-8">
-            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gold-600">Your name</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gold-600">Atelier door</p>
             <div className="mt-6 grid gap-4">
               <div>
-                <Label htmlFor="aname">Brand name</Label>
+                <Label htmlFor="aname">Atelier name</Label>
                 <Input
                   id="aname"
                   className="mt-2"
@@ -149,15 +152,15 @@ function Studio() {
                 </p>
               </div>
               <Button type="submit" disabled={busy}>
-                {busy ? "Opening…" : "Open studio"}
+                {busy ? "Opening…" : "Open atelier"}
               </Button>
             </div>
           </form>
           <aside className="rounded-2xl bg-charcoal-900 px-6 py-10 text-ivory-50 sm:px-8">
-            <p className="text-[10px] uppercase tracking-[0.22em] text-gold-300">Studio</p>
-            <h2 className="mt-3 font-serif text-3xl">Your page. Your pieces.</h2>
+            <p className="text-[10px] uppercase tracking-[0.22em] text-gold-300">The floor</p>
+            <h2 className="mt-3 font-serif text-3xl">A private showroom, not a stall.</h2>
             <p className="mt-4 text-sm font-light leading-relaxed text-ivory-200">
-              If you already sell on Drapé, sign in with that email. Your clothes will show here.
+              Existing Kampala houses already sit on the live floor. Sign in with that email and your pieces appear here — House of Zion, Tassy Stitches, Ensemble, UCJ, May Stitches.
             </p>
           </aside>
         </div>
@@ -167,21 +170,21 @@ function Studio() {
 
   return (
     <HouseRoom
-      eyebrow="Studio"
+      eyebrow="Designer studio"
       title={atelier.name}
       lede={`${atelier.city}, ${atelier.country}`}
       actions={
         <>
           {isAdmin && (
             <Button asChild variant="outline">
-              <Link to="/atelier-house">Admin</Link>
+              <Link to="/atelier-house">House ledger</Link>
             </Button>
           )}
           <Button asChild variant="outline">
-            <Link to="/desk">Messages</Link>
+            <Link to="/desk">Collector notes</Link>
           </Button>
           <Button asChild>
-            <Link to="/studio/new">Add a piece</Link>
+            <Link to="/studio/new">List a piece</Link>
           </Button>
         </>
       }
@@ -208,13 +211,13 @@ function Studio() {
             </p>
           ) : (
             <p className="mt-5 max-w-xl text-sm font-light text-charcoal-500">
-              This is your work room. Hide, edit, or remove a piece any time.
+              Your pieces are already on the Kampala floor. The showroom is the public door; this room is yours.
             </p>
           )}
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <RoomStat label="Pieces" value={pieces.length} />
+            <RoomStat label="On the floor" value={pieces.length} />
             <RoomStat label="City" value={atelier.city} />
-            <RoomStat label="Role" value={isDesigner ? "Designer" : "Guest"} />
+            <RoomStat label="Door" value={isDesigner ? "Atelier" : "Guest"} />
           </div>
           <div className="mt-8">
             <ShowroomShareCard slug={atelier.slug} name={atelier.name} />
@@ -225,23 +228,23 @@ function Studio() {
       <section className="mt-16">
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">Your list</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">The rail</p>
             <h2 className="mt-2 font-serif text-3xl text-charcoal-800">Your pieces</h2>
             <p className="mt-2 max-w-xl text-sm font-light text-charcoal-500">
-              Hide, change photos, or remove a listing.
+              Hide, change photographs, or remove a listing. Live Kampala pieces stay on the floor until you hide them here.
             </p>
           </div>
           <p className="text-xs tabular-nums text-charcoal-400">
-            {livePieces.length} live · {previewPieces.length} preview
+            {livePieces.length} live · {hiddenPieces.length} hidden
           </p>
         </div>
         {pieces.length === 0 ? (
           <RoomEmpty
-            title="No pieces yet"
-            body="Add a piece when you are ready. People will see it on your page."
+            title="The rail is empty"
+            body="Your showroom is open. List a piece when you are ready — collectors will find it on the floor."
             action={
               <Button asChild>
-                <Link to="/studio/new">Add a piece</Link>
+                <Link to="/studio/new">List a piece</Link>
               </Button>
             }
           />
@@ -266,12 +269,12 @@ function StudioRail({ pieces }: { pieces: Product[] }) {
   async function onHide(piece: Product) {
     setBusy(piece.slug);
     try {
-      if (isHiddenPiece(piece)) {
+      if (pieceIsHidden(piece)) {
         await unhidePiece(piece.slug);
-        toast.success("Shown again");
+        toast.success("Back on the floor");
       } else {
         await hidePiece(piece.slug);
-        toast.success("Hidden");
+        toast.success("Hidden from collectors");
       }
       await refresh();
     } catch (err) {
@@ -282,11 +285,11 @@ function StudioRail({ pieces }: { pieces: Product[] }) {
   }
 
   async function onDelete(piece: Product) {
-    if (!window.confirm(`Remove “${piece.name}”?`)) return;
+    if (!window.confirm(`Remove “${piece.name}” from the floor?`)) return;
     setBusy(piece.slug);
     try {
       await deletePiece(piece.slug);
-      toast.success("Removed");
+      toast.success("Removed from the floor");
       await refresh();
     } catch (err) {
       toast.error(houseError(err));
@@ -298,7 +301,7 @@ function StudioRail({ pieces }: { pieces: Product[] }) {
   return (
     <ul className="grid gap-4">
       {pieces.map((piece) => {
-        const hidden = isHiddenPiece(piece);
+        const hidden = pieceIsHidden(piece);
         return (
           <li
             key={piece.slug}
@@ -313,10 +316,6 @@ function StudioRail({ pieces }: { pieces: Product[] }) {
                 {hidden ? (
                   <span className="rounded-full bg-charcoal-800 px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-ivory-50">
                     Hidden
-                  </span>
-                ) : isPreviewPiece(piece) ? (
-                  <span className="rounded-full border border-charcoal-200 px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-charcoal-500">
-                    Preview
                   </span>
                 ) : (
                   <span className="rounded-full border border-charcoal-200 px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-charcoal-500">

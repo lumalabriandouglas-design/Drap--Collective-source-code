@@ -1,5 +1,5 @@
 import { getFloorSession, setFloorSession, type FloorSession } from "@/lib/floor-auth";
-import { invalidateFloor } from "@/lib/live-floor";
+import { invalidateFloor, showroomSlug } from "@/lib/live-floor";
 import type { AtelierProfile, Product } from "@/lib/types";
 
 const SUPABASE_URL = "https://fpvbhlbqojxrgnvxpcng.supabase.co";
@@ -67,12 +67,7 @@ async function rest<T>(path: string, init: RequestInit & { token: string }): Pro
 }
 
 export function slugFromRecord(name: string, id: string) {
-  const base = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 42);
-  return `${base || "piece"}-${id.slice(0, 8)}`;
+  return showroomSlug(name, id);
 }
 
 export function assertPublicPhotos(urls: string[]) {
