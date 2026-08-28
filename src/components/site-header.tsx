@@ -1,7 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Heart, Menu, Search, ShoppingBag, X } from "lucide-react";
+import { Heart, Search, ShoppingBag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AuthSlot } from "@/components/auth-slot";
+import { HouseNavSheet, MenuToggle } from "@/components/house-menu";
 import { Wordmark } from "@/components/wordmark";
 import { bagCount, useBag } from "@/lib/bag-store";
 import { useHouseRole } from "@/lib/use-role";
@@ -9,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 type NavItem = {
   label: string;
-  to: "/shop" | "/ateliers" | "/journal" | "/quiz" | "/studio" | "/atelier-house" | "/account" | "/desk" | "/join";
+  to: "/shop" | "/ateliers" | "/journal" | "/quiz" | "/studio" | "/atelier-house" | "/desk" | "/join";
 };
 
 function navFor(role: string | null, signedIn: boolean): NavItem[] {
@@ -35,7 +36,7 @@ function navFor(role: string | null, signedIn: boolean): NavItem[] {
   if (signedIn) {
     return [...shop, { label: "Messages", to: "/desk" }];
   }
-  return [...shop, { label: "Join", to: "/join" }];
+  return [...shop, { label: "Style Quiz", to: "/quiz" }];
 }
 
 export function SiteHeader() {
@@ -60,14 +61,6 @@ export function SiteHeader() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
   useEffect(() => setOpen(false), [pathname]);
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
 
   const linkClass = (active: boolean) =>
     cn(
@@ -127,7 +120,7 @@ export function SiteHeader() {
                 to="/account"
                 aria-label="Saved pieces"
                 className={cn(
-                  "grid size-11 place-items-center rounded-full transition-colors",
+                  "hidden size-11 place-items-center rounded-full transition-colors sm:grid",
                   overlay ? "text-ivory-50/80 hover:text-ivory-50" : "text-charcoal-500 hover:text-charcoal-800",
                 )}
               >
@@ -150,21 +143,8 @@ export function SiteHeader() {
               </Link>
             </>
           )}
-          <div className="hidden sm:block">
-            <AuthSlot light={overlay} />
-          </div>
-          <button
-            type="button"
-            className={cn(
-              "grid size-11 place-items-center rounded-full md:hidden",
-              overlay ? "text-ivory-50" : "text-charcoal-700",
-            )}
-            aria-label={open ? "Close menu" : "Open menu"}
-            aria-expanded={open}
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? <X size={18} /> : <Menu size={18} />}
-          </button>
+          <AuthSlot light={overlay} />
+          <MenuToggle open={open} light={overlay} onOpen={() => setOpen(true)} />
         </div>
       </div>
       <div
@@ -173,25 +153,7 @@ export function SiteHeader() {
           overlay ? "bg-ivory-50/15" : "bg-gold-400/35",
         )}
       />
-
-      {open && (
-        <div className="fixed inset-x-0 top-16 bottom-0 z-40 overflow-y-auto bg-ivory-50 md:hidden">
-          <nav className="mx-auto flex max-w-7xl flex-col px-4 py-6 sm:px-6">
-            {nav.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                className="flex min-h-12 items-center border-b border-charcoal-100/80 text-sm tracking-[0.14em] uppercase text-charcoal-800"
-              >
-                {item.label}
-              </Link>
-            ))}
-            <div className="pt-6">
-              <AuthSlot />
-            </div>
-          </nav>
-        </div>
-      )}
+      <HouseNavSheet open={open} onClose={() => setOpen(false)} nav={nav} />
     </header>
   );
 }
