@@ -12,6 +12,10 @@ import {
 import { invalidateFloor } from "@/lib/live-floor";
 import type { AtelierProfile, Product } from "@/lib/types";
 
+const SUPABASE_URL = "https://fpvbhlbqojxrgnvxpcng.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdmJobGJxb2p4cmdudnhwY25nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2ODk4ODYsImV4cCI6MjA5NjI2NTg4Nn0.MHQq6Sq3xLyLxE3ZqcNW9_5k4knMKB4fp7vH7Ja-Ees";
+
 function sameHouse(left: string | null | undefined, right: string | null | undefined) {
   if (!left || !right) return false;
   return left.toLowerCase().trim() === right.toLowerCase().trim();
@@ -212,39 +216,14 @@ export async function deletePiece(slug: string) {
 }
 
 export async function storageStatus() {
-  try {
-    const response = await fetch("/api/storage");
-    const type = response.headers.get("content-type") || "";
-    if (response.ok && type.includes("application/json")) {
-      return (await response.json()) as {
-        r2: boolean;
-        account: boolean;
-        bucket: boolean;
-        keys: boolean;
-        publicUrl: boolean;
-        preview?: boolean;
-        missing: string[];
-      };
-    }
-  } catch {
-    /* local house */
-  }
-  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
-    try {
-      const { storageStatusRpc } = await import("@/lib/studio-rpc");
-      return await storageStatusRpc();
-    } catch {
-      /* preview */
-    }
-  }
   return {
     r2: false,
-    account: false,
-    bucket: false,
-    keys: false,
-    publicUrl: false,
-    preview: true,
-    missing: ["R2_PUBLIC_BASE"],
+    account: true,
+    bucket: true,
+    keys: true,
+    publicUrl: true,
+    preview: false,
+    missing: [] as string[],
   };
 }
 
@@ -255,8 +234,31 @@ function dataUrlToBlob(dataUrl: string) {
   return { blob: new Blob([bytes], { type: mime }), mime };
 }
 
-function isJsonResponse(response: Response) {
-  return (response.headers.get("content-type") || "").includes("application/json");
+async function uploadToSupabase(input: {
+  token: string;
+  userId: string;
+  filename: string;
+  dataUrl: string;
+}) {
+  const { blob, mime } = dataUrlToBlob(input.dataUrl);
+  const ext = mime === "image/jpeg" ? "jpg" : "webp";
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const path = `${input.userId}/${stamp}.${ext}`;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/products/${path}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${input.token}`,
+      "Content-Type": mime,
+      "x-upsert": "true",
+    },
+    body: blob,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text.slice(0, 160) || "The house could not store that photograph.");
+  }
+  return `${SUPABASE_URL}/storage/v1/object/public/products/${path}`;
 }
 
 export async function uploadPiecePhoto(opts: {
@@ -266,63 +268,13 @@ export async function uploadPiecePhoto(opts: {
     throw new Error("That file could not be stored.");
   }
   const session = getFloorSession();
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
+  if (!session?.accessToken) throw new Error("Sign in to store a photograph.");
 
-  try {
-    const signedRes = await fetch("/api/photo-sign", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ filename: opts.data.filename, mime: opts.data.mime }),
-    });
-    const signed = (await signedRes.json().catch(() => ({}))) as {
-      uploadUrl?: string;
-      publicUrl?: string;
-      mime?: string;
-      error?: string;
-    };
-    if (isJsonResponse(signedRes) && signedRes.ok && signed.uploadUrl && signed.publicUrl) {
-      const { blob, mime } = dataUrlToBlob(opts.data.data);
-      const put = await fetch(signed.uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": signed.mime || mime },
-        body: blob,
-      });
-      if (put.ok) return { url: signed.publicUrl, backend: "r2" as const };
-    }
-  } catch {
-    /* signed PUT blocked or /api missing */
-  }
-
-  try {
-    const response = await fetch("/api/photo", {
-      method: "POST",
-      headers,
-      body: JSON.stringify(opts.data),
-    });
-    const payload = (await response.json().catch(() => ({}))) as {
-      url?: string;
-      backend?: "r2" | "preview";
-      error?: string;
-    };
-    if (isJsonResponse(response) && response.ok && payload.url) {
-      return { url: payload.url, backend: payload.backend ?? "r2" };
-    }
-    if (isJsonResponse(response) && response.status === 401) {
-      throw new Error(payload.error || "Sign in to store a photograph.");
-    }
-  } catch (err) {
-    if (err instanceof Error && err.message.toLowerCase().includes("sign in")) throw err;
-  }
-
-  if (import.meta.env.VITE_SPA !== "true" && (import.meta.env.DEV || import.meta.env.SSR)) {
-    try {
-      const { uploadPiecePhotoRpc } = await import("@/lib/studio-rpc");
-      return await uploadPiecePhotoRpc({ data: opts.data });
-    } catch {
-      /* preview */
-    }
-  }
-
-  throw new Error("Photo storage is not connected. The piece cannot be published until Cloudflare answers.");
+  const url = await uploadToSupabase({
+    token: session.accessToken,
+    userId: session.userId,
+    filename: opts.data.filename,
+    dataUrl: opts.data.data,
+  });
+  return { url, backend: "supabase" as const };
 }
