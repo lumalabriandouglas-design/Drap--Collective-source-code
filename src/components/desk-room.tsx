@@ -106,33 +106,36 @@ export function DeskInbox({
   isDesigner?: boolean;
 }) {
   const threads = useDeskList(userId, isAdmin, aliases);
+  const first = threads[0];
+  if (first) {
+    return (
+      <DeskConversation
+        threadId={first.liveId || first.id}
+        userId={userId}
+        isAdmin={isAdmin}
+        aliases={aliases}
+      />
+    );
+  }
   return (
     <HouseRoom
       eyebrow="Messages"
-      title="Your messages"
+      title="Inbox"
       lede={
         isDesigner
-          ? "People write to you here. Reply in this box — they will see it."
+          ? "Clients write here. Open a thread when the first note arrives."
           : "Write to a designer from a piece. Their reply lands here."
       }
     >
-      {threads.length === 0 ? (
-        <RoomEmpty
-          title="No messages yet"
-          body="Open a piece in the shop and tap Message. The designer will answer here."
-          action={
-            <Button asChild>
-              <Link to="/shop">Go to shop</Link>
-            </Button>
-          }
-        />
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-charcoal-100 bg-ivory-50">
-          {threads.map((thread) => (
-            <ThreadRow key={thread.id} thread={thread} userId={userId} aliases={aliases} active={false} />
-          ))}
-        </div>
-      )}
+      <RoomEmpty
+        title="No messages yet"
+        body="Open a piece in the shop and tap Message. The designer will answer here."
+        action={
+          <Button asChild>
+            <Link to="/shop">Go to shop</Link>
+          </Button>
+        }
+      />
     </HouseRoom>
   );
 }

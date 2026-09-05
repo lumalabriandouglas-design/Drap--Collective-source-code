@@ -201,6 +201,10 @@ export function deskUnread(thread: DeskThread, userId: string) {
   return thread.updatedAt > last;
 }
 
+export function deskUnreadTotal(userId: string, isAdmin: boolean, aliases: string[]) {
+  return listDeskThreads(userId, isAdmin, aliases).filter((t) => deskUnread(t, userId)).length;
+}
+
 export function markDeskRead(threadId: string, userId: string) {
   const store = readStore();
   const thread = store.threads.find((item) => item.id === threadId || item.liveId === threadId);

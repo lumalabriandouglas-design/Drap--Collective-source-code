@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Heart, ShoppingBag } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { HouseRoom, RolePill, RoomEmpty, RoomSkeleton, RoomStat } from "@/components/house-room";
 import { HouseAvatar } from "@/components/house-menu";
 import { LazyImage } from "@/components/lazy-image";
@@ -11,7 +12,8 @@ import { signOut } from "@/lib/auth/client";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { listOrders, listSavedProducts } from "@/lib/commerce";
 import { formatDay } from "@/lib/format";
-import { getMyStudio } from "@/lib/studio";
+import { houseError } from "@/lib/errors";
+import { openAtelier, getMyStudio } from "@/lib/studio";
 import { useHouseRole } from "@/lib/use-role";
 
 export const Route = createFileRoute("/account")({ component: Account });
@@ -44,14 +46,18 @@ function Account() {
 
   return (
     <HouseRoom
-      eyebrow="Collector salon"
+      eyebrow="Account"
       title={user.displayName ?? door}
-      lede={user.primaryEmail ?? "Your rooms in the house — orders, saved pieces, and the door you entered through."}
+      lede={
+        isDesigner
+          ? "Your house details live here — brand, bio, and mark. Pieces stay in Studio."
+          : "Your rooms in the house — orders, saved pieces, and the door you entered through."
+      }
       actions={
         <>
           {isDesigner && (
-            <Button asChild>
-              <Link to="/studio">{studio.data?.atelier ? "Your atelier" : "Open an atelier"}</Link>
+            <Button asChild variant="outline">
+              <Link to="/studio">Studio — pieces</Link>
             </Button>
           )}
           {isDesigner && studio.data?.atelier?.slug ? (
@@ -72,15 +78,15 @@ function Account() {
             </Button>
           )}
           <Button asChild variant="outline">
-            <Link to="/desk">The desk</Link>
+            <Link to="/desk">Messages</Link>
           </Button>
         </>
       }
     >
       <section className="flex flex-col gap-8 sm:flex-row sm:items-center">
         <HouseAvatar
-          src={user.profileImageUrl}
-          name={user.displayName ?? user.primaryEmail ?? "C"}
+          src={studio.data?.atelier?.imageUrl || user.profileImageUrl}
+          name={studio.data?.atelier?.name ?? user.displayName ?? user.primaryEmail ?? "C"}
           className="size-20 font-serif text-3xl outline outline-1 -outline-offset-1 outline-charcoal-800/10"
         />
         <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-4">
@@ -92,6 +98,16 @@ function Account() {
           </div>
         </div>
       </section>
+
+      {isDesigner ? (
+        <DesignerHouseCard
+          name={studio.data?.atelier?.name ?? user.displayName ?? ""}
+          city={studio.data?.atelier?.city ?? "Kampala"}
+          country={studio.data?.atelier?.country ?? "Uganda"}
+          bio={studio.data?.atelier?.bio ?? ""}
+          logo={studio.data?.atelier?.imageUrl ?? user.profileImageUrl ?? ""}
+        />
+      ) : null}
 
       <section className="mt-16">
         <div className="mb-8 flex items-end justify-between gap-4">
@@ -236,5 +252,100 @@ function Account() {
         </button>
       </p>
     </HouseRoom>
+  );
+}
+
+function DesignerHouseCard({
+  name,
+  city,
+  country,
+  bio,
+  logo,
+}: {
+  name: string;
+  city: string;
+  country: string;
+  bio: string;
+  logo: string;
+}) {
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({ name, city, country, bio, logo });
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    try {
+      await openAtelier({
+        data: {
+          name: form.name,
+          city: form.city,
+          country: form.country,
+          bio: form.bio,
+        },
+      });
+      await queryClient.invalidateQueries({ queryKey: ["studio"] });
+      toast.success("House details saved.");
+    } catch (err) {
+      toast.error(houseError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="mt-16 rounded-2xl border border-charcoal-100 bg-ivory-50 p-5 sm:p-8">
+      <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">House</p>
+      <h2 className="mt-2 font-serif text-3xl text-charcoal-800">Brand & mark</h2>
+      <p className="mt-2 max-w-xl text-sm text-charcoal-500">
+        Change the name collectors see, your city, and the line under your showroom. Work photos stay in Studio.
+      </p>
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <label className="block text-xs text-charcoal-500 sm:col-span-2">
+          Brand name
+          <input
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            className="mt-1 h-11 w-full rounded-xl border border-charcoal-100 bg-white px-3 text-sm text-charcoal-800 outline-none focus:border-gold-400"
+          />
+        </label>
+        <label className="block text-xs text-charcoal-500">
+          City
+          <input
+            value={form.city}
+            onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+            className="mt-1 h-11 w-full rounded-xl border border-charcoal-100 bg-white px-3 text-sm text-charcoal-800 outline-none focus:border-gold-400"
+          />
+        </label>
+        <label className="block text-xs text-charcoal-500">
+          Country
+          <input
+            value={form.country}
+            onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
+            className="mt-1 h-11 w-full rounded-xl border border-charcoal-100 bg-white px-3 text-sm text-charcoal-800 outline-none focus:border-gold-400"
+          />
+        </label>
+        <label className="block text-xs text-charcoal-500 sm:col-span-2">
+          Bio
+          <textarea
+            rows={3}
+            value={form.bio}
+            onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
+            className="mt-1 w-full resize-none rounded-xl border border-charcoal-100 bg-white px-3 py-2 text-sm text-charcoal-800 outline-none focus:border-gold-400"
+          />
+        </label>
+        <label className="block text-xs text-charcoal-500 sm:col-span-2">
+          Logo or portrait URL
+          <input
+            value={form.logo}
+            onChange={(e) => setForm((f) => ({ ...f, logo: e.target.value }))}
+            placeholder="https://…"
+            className="mt-1 h-11 w-full rounded-xl border border-charcoal-100 bg-white px-3 text-sm text-charcoal-800 outline-none focus:border-gold-400"
+          />
+        </label>
+      </div>
+      <Button type="button" className="mt-6" disabled={busy} onClick={() => void save()}>
+        {busy ? "Saving…" : "Save house"}
+      </Button>
+    </section>
   );
 }
