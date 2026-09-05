@@ -1,10 +1,12 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Heart, Search, ShoppingBag } from "lucide-react";
+import { Heart, MessageSquare, Search, ShoppingBag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AuthSlot } from "@/components/auth-slot";
 import { HouseNavSheet, MenuToggle } from "@/components/house-menu";
 import { Wordmark } from "@/components/wordmark";
 import { bagCount, useBag } from "@/lib/bag-store";
+import { deskUnreadTotal, pullLiveDesk, subscribeDesk } from "@/lib/desk";
+import { getFloorSession } from "@/lib/floor-auth";
 import { useHouseRole } from "@/lib/use-role";
 import { cn } from "@/lib/utils";
 
@@ -104,6 +106,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-1 sm:gap-2">
+          {user ? <HeaderDeskBadge light={overlay} /> : null}
           {designerWork ? null : (
             <>
               <Link
@@ -155,5 +158,40 @@ export function SiteHeader() {
       />
       <HouseNavSheet open={open} onClose={() => setOpen(false)} nav={nav} />
     </header>
+  );
+}
+
+function HeaderDeskBadge({ light }: { light: boolean }) {
+  const { user, isAdmin } = useHouseRole();
+  const session = getFloorSession();
+  const userId = session?.userId ?? user?.id ?? "";
+  const aliases = [session?.profileId, session?.brandName, session?.email].filter(Boolean) as string[];
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    if (!userId) return;
+    const tally = () => setUnread(deskUnreadTotal(userId, isAdmin, aliases));
+    tally();
+    const off = subscribeDesk(tally);
+    void pullLiveDesk().then(tally).catch(() => {});
+    return off;
+  }, [userId, isAdmin, aliases.join("|")]);
+
+  return (
+    <Link
+      to="/desk"
+      aria-label={unread ? `${unread} unread messages` : "Messages"}
+      className={cn(
+        "relative grid size-11 place-items-center rounded-full transition-colors",
+        light ? "text-ivory-50/80 hover:text-ivory-50" : "text-charcoal-500 hover:text-charcoal-800",
+      )}
+    >
+      <MessageSquare size={17} strokeWidth={1.5} />
+      {unread > 0 ? (
+        <span className="absolute top-1.5 right-1.5 grid min-w-4 place-items-center rounded-full bg-gold-500 px-1 text-[9px] font-semibold text-ivory-50 tabular-nums">
+          {unread > 9 ? "9+" : unread}
+        </span>
+      ) : null}
+    </Link>
   );
 }
