@@ -195,21 +195,43 @@ export function listDeskMessages(threadId: string): DeskMessage[] {
   return store.messages[id] ?? store.messages[threadId] ?? [];
 }
 
-export function deskUnread(thread: DeskThread, userId: string) {
-  const last = thread.readAt[userId];
+export function deskUnread(thread: DeskThread, userId: string, aliases: string[] = []) {
+  const keys = [userId, ...aliases].filter(Boolean);
+  const last = keys
+    .map((id) => thread.readAt[id])
+    .filter(Boolean)
+    .sort()
+    .at(-1);
   if (!last) return thread.lastPreview.length > 0;
   return thread.updatedAt > last;
 }
 
 export function deskUnreadTotal(userId: string, isAdmin: boolean, aliases: string[]) {
-  return listDeskThreads(userId, isAdmin, aliases).filter((t) => deskUnread(t, userId)).length;
+  return listDeskThreads(userId, isAdmin, aliases).filter((t) => deskUnread(t, userId, aliases)).length;
 }
 
-export function markDeskRead(threadId: string, userId: string) {
+export function markDeskRead(threadId: string, userId: string, aliases: string[] = []) {
   const store = readStore();
   const thread = store.threads.find((item) => item.id === threadId || item.liveId === threadId);
   if (!thread) return;
-  thread.readAt = { ...thread.readAt, [userId]: new Date().toISOString() };
+  const now = new Date().toISOString();
+  const next = { ...thread.readAt };
+  for (const id of [userId, ...aliases].filter(Boolean)) next[id] = now;
+  thread.readAt = next;
+  writeStore(store);
+}
+
+export function markDeskInboxRead(userId: string, isAdmin: boolean, aliases: string[]) {
+  const store = readStore();
+  const now = new Date().toISOString();
+  const mine = listDeskThreads(userId, isAdmin, aliases);
+  for (const thread of mine) {
+    const row = store.threads.find((item) => item.id === thread.id);
+    if (!row) continue;
+    const next = { ...row.readAt };
+    for (const id of [userId, ...aliases].filter(Boolean)) next[id] = now;
+    row.readAt = next;
+  }
   writeStore(store);
 }
 

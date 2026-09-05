@@ -223,7 +223,12 @@ export function HouseNavSheet({
             </button>
           </div>
           <div className="min-h-0 overflow-y-auto overscroll-contain pb-8">
-            {nav.map((item) => (
+            {nav
+              .filter((item) => {
+                if (item.to === "/desk" || item.to === "/studio" || item.to === "/atelier-house") return false;
+                return true;
+              })
+              .map((item) => (
               <Link
                 key={item.to}
                 to={item.to as "/"}

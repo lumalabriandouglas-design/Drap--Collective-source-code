@@ -12,6 +12,7 @@ import {
   listDeskMessages,
   listDeskThreads,
   markDeskRead,
+  markDeskInboxRead,
   pullLiveDesk,
   replyDesk,
   subscribeDesk,
@@ -67,7 +68,7 @@ function ThreadRow({
   active: boolean;
 }) {
   const other = deskOtherParty(thread, userId, aliases);
-  const unread = deskUnread(thread, userId);
+  const unread = deskUnread(thread, userId, aliases);
   return (
     <Link
       to="/desk/$threadId"
@@ -106,6 +107,9 @@ export function DeskInbox({
   isDesigner?: boolean;
 }) {
   const threads = useDeskList(userId, isAdmin, aliases);
+  useEffect(() => {
+    markDeskInboxRead(userId, isAdmin, aliases);
+  }, [userId, isAdmin, aliases.join("|"), threads.length]);
   const first = threads[0];
   if (first) {
     return (
@@ -160,8 +164,8 @@ export function DeskConversation({
   const known = useMemo(() => new Set([userId, ...aliases]), [userId, aliases]);
 
   useEffect(() => {
-    if (thread) markDeskRead(threadId, userId);
-  }, [threadId, userId, thread?.updatedAt]);
+    if (thread) markDeskRead(threadId, userId, aliases);
+  }, [threadId, userId, thread?.updatedAt, aliases.join("|")]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
