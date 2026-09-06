@@ -35,6 +35,7 @@ export const Route = createRootRoute({
         content: "Shop original clothes from independent Kampala designers.",
       },
       { name: "theme-color", content: "#F6F1EA" },
+      { name: "google-site-verification", content: "6EHqUT7200YHh02sinjadvrn2L1oJd9_yVS1ube8yxI" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
