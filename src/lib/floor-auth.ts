@@ -339,6 +339,42 @@ export async function floorSignUp(input: {
   return joined;
 }
 
+export function floorStartOAuth(provider: "google" | "apple", door?: "client" | "designer") {
+  if (typeof window === "undefined") return;
+  if (door) {
+    try {
+      window.localStorage.setItem("drape.oauth-door", door);
+    } catch {
+      /* ignore */
+    }
+  }
+  const redirect = `${window.location.origin}/login`;
+  const url = new URL(`${SUPABASE_URL}/auth/v1/authorize`);
+  url.searchParams.set("provider", provider);
+  url.searchParams.set("redirect_to", redirect);
+  window.location.assign(url.toString());
+}
+
+export async function floorFinishOAuthFromUrl(): Promise<FloorSession | null> {
+  if (typeof window === "undefined") return null;
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const query = new URLSearchParams(window.location.search);
+  const accessToken = hash.get("access_token") || query.get("access_token");
+  if (!accessToken) return null;
+  let door: "client" | "designer" | undefined;
+  try {
+    const stored = window.localStorage.getItem("drape.oauth-door");
+    if (stored === "designer" || stored === "client") door = stored;
+    window.localStorage.removeItem("drape.oauth-door");
+  } catch {
+    /* ignore */
+  }
+  const session = await sessionFromToken(accessToken, "", door ? { forceRole: door } : undefined);
+  setFloorSession(session);
+  window.history.replaceState({}, "", "/login");
+  return session;
+}
+
 export async function fetchFloorProfiles() {
   const url = new URL(`${SUPABASE_URL}/rest/v1/profiles`);
   url.searchParams.set("select", "email,role,brand_name,username,status,location,created_at");

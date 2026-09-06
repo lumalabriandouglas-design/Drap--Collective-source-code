@@ -301,21 +301,23 @@ async function uploadToSupabase(input: {
   const ext = mime === "image/jpeg" ? "jpg" : "webp";
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const path = `${input.userId}/${stamp}.${ext}`;
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/products/${path}`, {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${input.token}`,
-      "Content-Type": mime,
-      "x-upsert": "true",
-    },
-    body: blob,
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(text.slice(0, 160) || "The house could not store that photograph.");
+  const buckets = ["products", "product-images", "images", "avatars"];
+  let last = "The house could not store that photograph.";
+  for (const bucket of buckets) {
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${input.token}`,
+        "Content-Type": mime,
+        "x-upsert": "true",
+      },
+      body: blob,
+    });
+    if (res.ok) return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+    last = (await res.text().catch(() => "")).slice(0, 160) || last;
   }
-  return `${SUPABASE_URL}/storage/v1/object/public/products/${path}`;
+  throw new Error(last);
 }
 
 export async function uploadPiecePhoto(opts: {
@@ -327,16 +329,18 @@ export async function uploadPiecePhoto(opts: {
   const session = getFloorSession();
   if (!session?.accessToken) throw new Error("Sign in to store a photograph.");
 
-  try {
-    const url = await uploadToCloudflare({
-      token: session.accessToken,
-      filename: opts.data.filename,
-      mime: opts.data.mime,
-      dataUrl: opts.data.data,
-    });
-    if (url) return { url, backend: "r2" as const };
-  } catch {
-    /* the bucket stays behind the drapes */
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const url = await uploadToCloudflare({
+        token: session.accessToken,
+        filename: opts.data.filename,
+        mime: opts.data.mime,
+        dataUrl: opts.data.data,
+      });
+      if (url) return { url, backend: "r2" as const };
+    } catch {
+      /* try the house store */
+    }
   }
 
   const url = await uploadToSupabase({

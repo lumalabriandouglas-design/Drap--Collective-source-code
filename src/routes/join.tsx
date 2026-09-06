@@ -6,7 +6,7 @@ import { HouseDoor } from "@/components/house-door";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { houseError } from "@/lib/errors";
+import { HouseOauth } from "@/components/house-oauth";
 import { floorSignUp, type FloorRole } from "@/lib/floor-auth";
 import { pathForRole } from "@/lib/use-role";
 
@@ -182,6 +182,9 @@ function Join() {
               <Button type="submit" className="w-full" disabled={busy}>
                 {busy ? "Opening the door…" : door === "designer" ? "Create designer account" : "Create collector account"}
               </Button>
+              <div className="pt-2">
+                <HouseOauth busy={busy} door={door} />
+              </div>
               <p className="text-center text-xs text-charcoal-500">
                 Already in the house?{" "}
                 <Link to="/login" className="text-charcoal-800 hover:underline">

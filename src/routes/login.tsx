@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authEnabled } from "@/lib/auth/auth-enabled";
 import { houseError } from "@/lib/errors";
-import { floorSignIn, setFloorSession, type FloorRole, type FloorSession } from "@/lib/floor-auth";
+import { HouseOauth } from "@/components/house-oauth";
+import { floorSignIn, floorFinishOAuthFromUrl, setFloorSession, type FloorRole, type FloorSession } from "@/lib/floor-auth";
 import { staticFloor } from "@/lib/house-mode";
 import { getMyRole } from "@/lib/roles";
 import { pathForRole } from "@/lib/use-role";
@@ -26,7 +27,17 @@ function Login() {
   useEffect(() => {
     document.body.style.overflow = "";
     document.body.style.pointerEvents = "";
-  }, []);
+    void floorFinishOAuthFromUrl()
+      .then(async (session) => {
+        if (!session) return;
+        toast.success("Signed in");
+        const dest = pathForRole(session.role);
+        if (dest === "/atelier-house") await navigate({ to: "/atelier-house" });
+        else if (dest === "/studio") await navigate({ to: "/studio" });
+        else await navigate({ to: "/account" });
+      })
+      .catch((err) => setHint(houseError(err)));
+  }, [navigate]);
 
   async function goToRoom(role?: FloorRole) {
     const dest = pathForRole(role ?? (await getMyRole()).role);
@@ -145,6 +156,9 @@ function Login() {
               <Button type="submit" className="w-full" disabled={busy}>
                 {busy ? "Please wait…" : "Sign in"}
               </Button>
+              <div className="pt-2">
+                <HouseOauth busy={busy} />
+              </div>
               <a href="/join" className="w-full pt-1 text-center text-xs text-charcoal-500 hover:text-charcoal-800">
                 Need an account? Join the house
               </a>
