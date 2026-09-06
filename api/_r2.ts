@@ -1,5 +1,3 @@
-import { AwsClient } from "aws4fetch";
-
 const HOUSE = {
   accountId: "558dca581274b42590d6dfd88a9a1e24",
   bucket: "odrapecollective",
@@ -17,7 +15,7 @@ function pick(names: string[]) {
   for (const name of names) {
     const raw = process.env[name];
     if (typeof raw !== "string") continue;
-    const value = raw.trim().replace(/^[\'"]|[\'"]$/g, "").replace(/\/$/, "");
+    const value = raw.trim().replace(/^['"]|['"]$/g, "").replace(/\/$/, "");
     if (value) return value;
   }
   return "";
@@ -66,15 +64,6 @@ export function r2Status() {
   };
 }
 
-function client(cfg: R2Config) {
-  return new AwsClient({
-    accessKeyId: cfg.accessKeyId,
-    secretAccessKey: cfg.secretAccessKey,
-    service: "s3",
-    region: "auto",
-  });
-}
-
 function safeName(filename: string) {
   const base = filename.toLowerCase().replace(/[^a-z0-9.]+/g, "-").replace(/^-+|-+$/g, "");
   return base.slice(0, 80) || "piece.webp";
@@ -88,10 +77,17 @@ export async function putR2Object(input: {
 }) {
   const cfg = readR2();
   if (!cfg) return null;
+  const { AwsClient } = await import("aws4fetch");
   const mime = input.mime === "image/jpeg" ? "image/jpeg" : "image/webp";
   const key = `${input.folder}/${Date.now()}-${safeName(input.filename)}`;
   const endpoint = `https://${cfg.accountId}.r2.cloudflarestorage.com/${cfg.bucket}/${key}`;
-  const response = await client(cfg).fetch(endpoint, {
+  const aws = new AwsClient({
+    accessKeyId: cfg.accessKeyId,
+    secretAccessKey: cfg.secretAccessKey,
+    service: "s3",
+    region: "auto",
+  });
+  const response = await aws.fetch(endpoint, {
     method: "PUT",
     headers: {
       "Content-Type": mime,

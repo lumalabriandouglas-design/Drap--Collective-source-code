@@ -37,7 +37,17 @@ This branch does **not** run database migrations on build. Do not set `DATABASE_
 | `R2_PUBLIC_BASE` | Public bucket URL, e.g. `https://pub-….r2.dev` — not the `*.r2.cloudflarestorage.com` API host |
 | `DATABASE_URL` | Leave unset on this preview. Do not point it at live Supabase. |
 
-The Vercel project already has the R2 keys on Production and Preview. Do not add `DATABASE_URL`.
+The live site reads these on the server only. In Vercel → Project → Settings → Environment Variables, set them for Production and Preview, then Redeploy:
+
+- `R2_ACCOUNT_ID`
+- `R2_BUCKET` = `odrapecollective`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_PUBLIC_BASE` = public URL such as `https://pub-….r2.dev` (never the `*.r2.cloudflarestorage.com` API host)
+
+`/api/storage` should then return `"r2": true`. If keys are missing, photographs still save to the house store so listings are not blocked.
+
+Do not add `DATABASE_URL` on this preview.
 
 ## Cloudflare R2 CORS
 
