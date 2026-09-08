@@ -134,7 +134,7 @@ export async function getOwnedPiece(slug: string): Promise<Product | null> {
 }
 
 export async function openAtelier(opts: {
-  data: { name: string; city: string; country: string; bio: string };
+  data: { name: string; city: string; country: string; bio: string; imageUrl?: string };
 }) {
   const session = getFloorSession();
   if (session) {

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Heart, ShoppingBag } from "lucide-react";
-import { useState } from "react";
+import { Heart, ShoppingBag, Camera } from "lucide-react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { HouseRoom, RolePill, RoomEmpty, RoomSkeleton, RoomStat } from "@/components/house-room";
 import { HouseAvatar } from "@/components/house-menu";
@@ -13,7 +13,8 @@ import { RedirectToSignIn } from "@/lib/auth/gates";
 import { listOrders, listSavedProducts } from "@/lib/commerce";
 import { formatDay } from "@/lib/format";
 import { houseError } from "@/lib/errors";
-import { openAtelier, getMyStudio } from "@/lib/studio";
+import { openAtelier, getMyStudio, uploadPiecePhoto } from "@/lib/studio";
+import { compressImage } from "@/lib/media";
 import { useHouseRole } from "@/lib/use-role";
 
 export const Route = createFileRoute("/account")({ component: Account });
@@ -269,21 +270,29 @@ function DesignerHouseCard({
   logo: string;
 }) {
   const queryClient = useQueryClient();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({ name, city, country, bio, logo });
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  async function persist(next = form) {
+    await openAtelier({
+      data: {
+        name: next.name,
+        city: next.city,
+        country: next.country,
+        bio: next.bio,
+        imageUrl: next.logo,
+      },
+    });
+    await queryClient.invalidateQueries({ queryKey: ["studio"] });
+    await queryClient.invalidateQueries({ queryKey: ["designers"] });
+  }
 
   async function save() {
     setBusy(true);
     try {
-      await openAtelier({
-        data: {
-          name: form.name,
-          city: form.city,
-          country: form.country,
-          bio: form.bio,
-        },
-      });
-      await queryClient.invalidateQueries({ queryKey: ["studio"] });
+      await persist();
       toast.success("House details saved.");
     } catch (err) {
       toast.error(houseError(err));
@@ -292,13 +301,69 @@ function DesignerHouseCard({
     }
   }
 
+  async function onMark(list: FileList | null) {
+    const file = list?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const result = await compressImage(file, { maxBytes: 280 * 1024, maxEdge: 900 });
+      const uploaded = await uploadPiecePhoto({
+        data: {
+          filename: result.file.name || "mark.webp",
+          mime: result.mimeType,
+          data: result.dataUrl,
+        },
+      });
+      const next = { ...form, logo: uploaded.url };
+      setForm(next);
+      await persist(next);
+      toast.success("Your mark is on the house.");
+    } catch (err) {
+      toast.error(houseError(err));
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
   return (
     <section className="mt-16 rounded-2xl border border-charcoal-100 bg-ivory-50 p-5 sm:p-8">
       <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">House</p>
       <h2 className="mt-2 font-serif text-3xl text-charcoal-800">Brand & mark</h2>
       <p className="mt-2 max-w-xl text-sm text-charcoal-500">
-        Change the name collectors see, your city, and the line under your showroom. Work photos stay in Studio.
+        Change the name collectors see, your city, and the portrait on your showroom. Work photos stay in Studio.
       </p>
+
+      <div className="mt-6 flex flex-wrap items-center gap-4">
+        <HouseAvatar
+          src={form.logo}
+          name={form.name || "M"}
+          className="size-24 font-serif text-3xl outline outline-1 -outline-offset-1 outline-charcoal-800/10"
+        />
+        <div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic"
+            className="sr-only"
+            onChange={(e) => void onMark(e.target.files)}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={uploading || busy}
+            onClick={() => fileRef.current?.click()}
+          >
+            <Camera size={14} />
+            {uploading ? "Uploading…" : form.logo ? "Change portrait" : "Add portrait"}
+          </Button>
+          <p className="mt-2 max-w-xs text-xs text-charcoal-400">
+            Choose a photo from this computer or phone. It replaces the old mark.
+          </p>
+        </div>
+      </div>
+
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <label className="block text-xs text-charcoal-500 sm:col-span-2">
           Brand name
@@ -333,17 +398,8 @@ function DesignerHouseCard({
             className="mt-1 w-full resize-none rounded-xl border border-charcoal-100 bg-white px-3 py-2 text-sm text-charcoal-800 outline-none focus:border-gold-400"
           />
         </label>
-        <label className="block text-xs text-charcoal-500 sm:col-span-2">
-          Logo or portrait URL
-          <input
-            value={form.logo}
-            onChange={(e) => setForm((f) => ({ ...f, logo: e.target.value }))}
-            placeholder="https://…"
-            className="mt-1 h-11 w-full rounded-xl border border-charcoal-100 bg-white px-3 text-sm text-charcoal-800 outline-none focus:border-gold-400"
-          />
-        </label>
       </div>
-      <Button type="button" className="mt-6" disabled={busy} onClick={() => void save()}>
+      <Button type="button" className="mt-6" disabled={busy || uploading} onClick={() => void save()}>
         {busy ? "Saving…" : "Save house"}
       </Button>
     </section>

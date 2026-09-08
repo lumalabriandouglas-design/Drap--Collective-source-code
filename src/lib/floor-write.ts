@@ -101,6 +101,7 @@ export async function patchDesignerProfile(input: {
   city: string;
   country: string;
   bio: string;
+  imageUrl?: string;
 }): Promise<AtelierProfile> {
   const session = sessionOrThrow();
   const name = input.name.trim();
@@ -109,16 +110,18 @@ export async function patchDesignerProfile(input: {
   const bio = input.bio.trim();
   if (name.length < 2) throw new Error("Give your studio a name.");
   const location = `${city}, ${country}`;
-  const body = {
+  const mark = input.imageUrl?.trim();
+  const body: Record<string, string> = {
     brand_name: name,
     username: name.slice(0, 48),
     bio,
     location,
     role: session.role === "admin" ? "admin" : "designer",
   };
+  if (mark && mark.startsWith("http")) body.profile_photo_url = mark;
 
   const tryPatch = async (column: string, value: string) =>
-    rest<Array<{ id: string; brand_name: string | null; username: string | null; bio: string | null; location: string | null }>>(
+    rest<Array<{ id: string; brand_name: string | null; username: string | null; bio: string | null; location: string | null; profile_photo_url?: string | null }>>(
       `profiles?${column}=eq.${encodeURIComponent(value)}`,
       { method: "PATCH", token: session.accessToken, body: JSON.stringify(body) },
     );
@@ -134,15 +137,17 @@ export async function patchDesignerProfile(input: {
     throw new Error("Could not open your studio on the house book.");
   }
 
+  const photo = mark || rows[0].profile_photo_url || session.avatarUrl;
   if (session.role !== "admin") {
     setFloorSession({
       ...session,
       role: "designer",
       brandName: name,
       displayName: name,
+      avatarUrl: photo || session.avatarUrl,
     });
   } else {
-    setFloorSession({ ...session, brandName: name, displayName: name });
+    setFloorSession({ ...session, brandName: name, displayName: name, avatarUrl: photo || session.avatarUrl });
   }
 
   const profile = rows[0];
@@ -153,7 +158,7 @@ export async function patchDesignerProfile(input: {
     city,
     country,
     bio: profile.bio?.trim() || bio,
-    imageUrl: session.avatarUrl,
+    imageUrl: photo || session.avatarUrl || "",
     recordId: profile.id,
   };
 }
