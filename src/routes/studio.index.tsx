@@ -31,6 +31,8 @@ function Studio() {
     queryKey: ["studio"],
     enabled: Boolean(user),
     queryFn: () => getMyStudio(),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
   const [form, setForm] = useState({
     name: "",
@@ -210,11 +212,20 @@ function Studio() {
         {pieces.length === 0 ? (
           <RoomEmpty
             title="The rail is empty"
-            body="Your showroom is open. List a piece when you are ready — collectors will find it on the floor."
+            body={
+              user.primaryEmail
+                ? `This computer is signed in as ${user.primaryEmail}. Pieces posted on another email or Google account stay with that house — sign out and open the same door you use on your phone.`
+                : "Your showroom is open. List a piece when you are ready — collectors will find it on the floor."
+            }
             action={
-              <Button asChild>
-                <Link to="/studio/new">List a piece</Link>
-              </Button>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button asChild>
+                  <Link to="/studio/new">List a piece</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link to="/account">Account</Link>
+                </Button>
+              </div>
             }
           />
         ) : (

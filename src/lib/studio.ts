@@ -85,12 +85,24 @@ async function studioFromFloor(): Promise<StudioState> {
 
   if (!atelier) return { atelier: null, pieces: [] };
 
+  let fromHouse: Product[] = [];
   try {
     const raw = await fetchMyRawProducts();
-    return { atelier, pieces: raw.map((row) => mapRawToStudioPiece(row, atelier)) };
+    fromHouse = raw.map((row) => mapRawToStudioPiece(row, atelier));
   } catch {
-    return { atelier, pieces: livePieces };
+    fromHouse = [];
   }
+  const byId = new Map<string, Product>();
+  for (const piece of fromHouse) byId.set(piece.recordId || piece.slug, piece);
+  for (const piece of livePieces) {
+    const key = piece.recordId || piece.slug;
+    if (!byId.has(key)) byId.set(key, { ...piece, hidden: pieceIsHiddenTag(piece) });
+  }
+  return { atelier, pieces: [...byId.values()] };
+}
+
+function pieceIsHiddenTag(piece: Product) {
+  return Boolean(piece.hidden) || piece.tags.includes("hidden");
 }
 
 export async function getMyStudio(): Promise<StudioState> {

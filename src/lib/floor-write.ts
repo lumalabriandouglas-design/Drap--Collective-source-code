@@ -144,17 +144,30 @@ export async function patchDesignerProfile(input: {
 export async function fetchMyRawProducts(): Promise<RawFloorProduct[]> {
   const session = sessionOrThrow();
   const ids = [...new Set([session.profileId, session.userId].filter(Boolean))];
-  const batches = await Promise.all(
-    ids.map((id) =>
-      rest<RawFloorProduct[]>(
-        `products?user_id=eq.${id}&is_deleted=eq.false&select=*&order=created_at.desc&limit=100`,
-        { method: "GET", token: session.accessToken },
-      ).catch(() => [] as RawFloorProduct[]),
-    ),
-  );
-  const byId = new Map<string, RawFloorProduct>();
-  for (const row of batches.flat()) byId.set(row.id, row);
-  return [...byId.values()];
+  if (!ids.length) return [];
+  const filter =
+    ids.length === 1 ? `user_id=eq.${ids[0]}` : `or=(${ids.map((id) => `user_id.eq.${id}`).join(",")})`;
+  try {
+    const rows = await rest<RawFloorProduct[]>(
+      `products?${filter}&select=*&order=created_at.desc&limit=100`,
+      { method: "GET", token: session.accessToken },
+    );
+    return (Array.isArray(rows) ? rows : []).filter((row) => row && row.is_deleted !== true);
+  } catch {
+    const batches = await Promise.all(
+      ids.map((id) =>
+        rest<RawFloorProduct[]>(`products?user_id=eq.${id}&select=*&order=created_at.desc&limit=100`, {
+          method: "GET",
+          token: session.accessToken,
+        }).catch(() => [] as RawFloorProduct[]),
+      ),
+    );
+    const byId = new Map<string, RawFloorProduct>();
+    for (const row of batches.flat()) {
+      if (row?.id && row.is_deleted !== true) byId.set(row.id, row);
+    }
+    return [...byId.values()];
+  }
 }
 
 export async function insertLiveProduct(input: {
