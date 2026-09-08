@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Eye, EyeOff, MapPin, Pencil, Trash2 } from "lucide-react";
+import { Bookmark, Eye, EyeOff, MapPin, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { HouseRoom, RolePill, RoomEmpty, RoomSkeleton, RoomStat } from "@/components/house-room";
@@ -14,7 +14,7 @@ import { RedirectToSignIn } from "@/lib/auth/gates";
 import { ATELIER_BIO_MAX } from "@/lib/constants";
 import { houseError } from "@/lib/errors";
 import { claimRole } from "@/lib/roles";
-import { deletePiece, getMyStudio, hidePiece, openAtelier, unhidePiece } from "@/lib/studio";
+import { deletePiece, getMyStudio, hidePiece, openAtelier, reservePiece, unhidePiece } from "@/lib/studio";
 import type { Product } from "@/lib/types";
 import { useHouseRole } from "@/lib/use-role";
 
@@ -22,6 +22,10 @@ export const Route = createFileRoute("/studio/")({ component: Studio });
 
 function pieceIsHidden(piece: Product) {
   return Boolean(piece.hidden) || piece.tags.includes("hidden");
+}
+
+function pieceIsReserved(piece: Product) {
+  return Boolean(piece.reserved) || piece.tags.includes("reserved");
 }
 
 function Studio() {
@@ -283,6 +287,20 @@ function StudioRail({ pieces }: { pieces: Product[] }) {
     await client.invalidateQueries({ queryKey: ["designers"] });
   }
 
+  async function onReserve(piece: Product) {
+    setBusy(piece.slug);
+    try {
+      const next = !pieceIsReserved(piece);
+      await reservePiece(piece.slug, next);
+      toast.success(next ? "Marked reserved" : "Back for collectors");
+      await refresh();
+    } catch (err) {
+      toast.error(houseError(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function onHide(piece: Product) {
     setBusy(piece.slug);
     try {
@@ -341,6 +359,10 @@ function StudioRail({ pieces }: { pieces: Product[] }) {
                   <span className="rounded-full bg-charcoal-800 px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-ivory-50">
                     Hidden
                   </span>
+                ) : pieceIsReserved(piece) ? (
+                  <span className="rounded-full bg-gold-500 px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-ivory-50">
+                    Reserved
+                  </span>
                 ) : (
                   <span className="rounded-full border border-charcoal-200 px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-charcoal-500">
                     Live
@@ -372,6 +394,16 @@ function StudioRail({ pieces }: { pieces: Product[] }) {
               >
                 {hidden ? <Eye size={14} /> : <EyeOff size={14} />}
                 {hidden ? "Show" : "Hide"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy === piece.slug}
+                onClick={() => void onReserve(piece)}
+              >
+                <Bookmark size={14} fill={pieceIsReserved(piece) ? "currentColor" : "none"} />
+                {pieceIsReserved(piece) ? "Unreserve" : "Reserve"}
               </Button>
               <Button
                 type="button"

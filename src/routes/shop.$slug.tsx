@@ -9,6 +9,7 @@ import { LazyImage } from "@/components/lazy-image";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { WhatsAppDoor } from "@/components/whatsapp-door";
+import { LeaveNumber } from "@/components/leave-number";
 import { useBag } from "@/lib/bag-store";
 import { getProduct, listRelated } from "@/lib/catalog";
 import { listWishlist, sendInquiry, toggleWishlist } from "@/lib/commerce";
@@ -156,7 +157,8 @@ function ProductPage() {
               alt={product.name}
               width={1440}
               eager
-              className="aspect-portrait w-full"
+              fit="contain"
+              className="aspect-portrait w-full bg-charcoal-900"
             />
           </div>
           {images.length > 1 && (
@@ -231,9 +233,15 @@ function ProductPage() {
           )}
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button size="lg" onClick={addToBag}>
-              Add to bag
-            </Button>
+            {piece.reserved ? (
+              <p className="inline-flex h-12 items-center rounded-full bg-charcoal-800 px-6 text-[11px] tracking-[0.14em] uppercase text-ivory-50">
+                Reserved
+              </p>
+            ) : (
+              <Button size="lg" onClick={addToBag}>
+                Add to bag
+              </Button>
+            )}
             <Button size="lg" variant="outline" onClick={() => void onSave()}>
               <Heart size={15} fill={saved ? "currentColor" : "none"} />
               Save
@@ -268,6 +276,15 @@ function ProductPage() {
                 />
               </div>
             ) : null}
+          </div>
+
+          <LeaveNumber
+            house={product.designer.name}
+            atelierId={product.designer.userId}
+            atelierSlug={product.designer.slug}
+            whatsapp={product.designer.whatsapp}
+            piece={{ name: product.name, slug: product.slug, image: images[0] }}
+          />
           </div>
         </div>
       </div>

@@ -278,7 +278,10 @@ export async function updateLiveProduct(input: {
   return { id: input.recordId, slug: slugFromRecord(row?.name || input.name, input.recordId) };
 }
 
-export async function setLiveProductFlags(recordId: string, flags: { is_hidden?: boolean; is_deleted?: boolean }) {
+export async function setLiveProductFlags(
+  recordId: string,
+  flags: { is_hidden?: boolean; is_deleted?: boolean; tags?: string[] },
+) {
   const session = sessionOrThrow();
   await rest(`products?id=eq.${recordId}`, {
     method: "PATCH",
@@ -308,6 +311,7 @@ export function mapRawToStudioPiece(row: RawFloorProduct, atelier: AtelierProfil
     leadTime: row.lead_time || "Made to order · inquire",
     featured: Boolean(row.is_featured),
     hidden: Boolean(row.is_hidden),
+    reserved: (row.tags ?? []).map(String).includes("reserved"),
     listedBy: row.user_id,
     designer: {
       id: atelier.id,

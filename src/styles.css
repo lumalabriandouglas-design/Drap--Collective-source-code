@@ -230,6 +230,13 @@ html[data-theme="charcoal"] .hover\:bg-charcoal-800:hover {
   object-fit: cover;
 }
 
+.img-contain {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: top;
+}
+
 @keyframes kenburns {
   from {
     transform: scale(1);

@@ -29,6 +29,7 @@ export type Product = {
   leadTime: string | null;
   featured: boolean;
   hidden?: boolean;
+  reserved?: boolean;
   listedBy: string | null;
   designer: Pick<Designer, "id" | "slug" | "name" | "city" | "country" | "imageUrl" | "userId" | "whatsapp">;
 };

@@ -10,15 +10,17 @@ export function WhatsAppDoor({
   piece,
   light = false,
   onDesk,
+  prefill,
 }: {
   house: string;
   number: string;
   piece?: { name?: string; slug?: string } | null;
   light?: boolean;
   onDesk?: () => void;
+  prefill?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const href = whatsappHref(number, house, piece);
+  const href = whatsappHref(number, house, piece, prefill);
   if (!href) return null;
 
   function close() {

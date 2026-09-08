@@ -147,8 +147,9 @@ export function DesignerShowroom({
             alt={hero.name}
             width={1800}
             eager
-            className="absolute inset-0 size-full"
-            imgClassName="object-cover object-top"
+            className="absolute inset-0 size-full bg-charcoal-900"
+            imgClassName="object-contain object-top"
+            fit="contain"
           />
         ) : (
           <LazyImage
@@ -156,8 +157,9 @@ export function DesignerShowroom({
             alt={designer.name}
             width={1800}
             eager
-            className="absolute inset-0 size-full"
-            imgClassName="object-cover"
+            className="absolute inset-0 size-full bg-charcoal-900"
+            imgClassName="object-contain object-top"
+            fit="contain"
           />
         )}
         <div className="absolute inset-0 bg-linear-to-t from-charcoal-900 via-charcoal-900/45 to-charcoal-900/25" />
@@ -244,7 +246,7 @@ export function DesignerShowroom({
                     <div>
                       <h3 className="font-serif text-2xl text-charcoal-800">{piece.name}</h3>
                       <p className="mt-1 text-xs uppercase tracking-[0.12em] text-charcoal-400">
-                        {piece.category}
+                        {piece.reserved ? "Reserved" : piece.category}
                         {piece.leadTime ? ` · ${piece.leadTime}` : ""}
                       </p>
                     </div>

@@ -40,7 +40,11 @@ export function ProductCard({
           <h3 className="font-serif text-[15px] font-medium leading-snug text-charcoal-800 transition-colors group-hover:text-charcoal-600">
             {product.name}
           </h3>
-          <Price cents={product.priceCents} className="mt-1.5 block text-sm text-charcoal-700" />
+          {product.reserved ? (
+            <p className="mt-1.5 text-[11px] uppercase tracking-[0.12em] text-gold-700">Reserved</p>
+          ) : (
+            <Price cents={product.priceCents} className="mt-1.5 block text-sm text-charcoal-700" />
+          )}
         </Link>
       </div>
     </article>

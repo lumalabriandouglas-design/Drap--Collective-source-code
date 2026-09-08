@@ -9,6 +9,7 @@ export function LazyImage({
   className,
   imgClassName,
   eager = false,
+  fit = "cover",
 }: {
   src: string;
   alt: string;
@@ -16,15 +17,16 @@ export function LazyImage({
   className?: string;
   imgClassName?: string;
   eager?: boolean;
+  fit?: "cover" | "contain";
 }) {
   const [failed, setFailed] = useState(false);
   const display = failed ? src : displayImage(src, width);
   return (
-    <div className={cn("overflow-hidden bg-ivory-100", className)}>
+    <div className={cn("overflow-hidden bg-ivory-100", fit === "contain" && "bg-charcoal-900", className)}>
       <img
         src={display}
         alt={alt}
-        className={cn("img-cover", imgClassName)}
+        className={cn(fit === "contain" ? "img-contain" : "img-cover", imgClassName)}
         loading={eager ? "eager" : "lazy"}
         decoding="async"
         onError={() => setFailed(true)}

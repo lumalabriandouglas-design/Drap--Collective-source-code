@@ -36,8 +36,13 @@ export function pieceWhatsAppNote(house: string, piece?: { name?: string; slug?:
   return `Hello ${house} — I am writing about ${piece.name}.${url}`;
 }
 
-export function whatsappHref(raw: string | null | undefined, house: string, piece?: { name?: string; slug?: string } | null) {
+export function whatsappHref(
+  raw: string | null | undefined,
+  house: string,
+  piece?: { name?: string; slug?: string } | null,
+  prefill?: string,
+) {
   const link = waLink(raw);
   if (!link) return "";
-  return `${link}?text=${encodeURIComponent(pieceWhatsAppNote(house, piece))}`;
+  return `${link}?text=${encodeURIComponent(prefill || pieceWhatsAppNote(house, piece))}`;
 }

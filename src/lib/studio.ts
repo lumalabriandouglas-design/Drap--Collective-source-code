@@ -255,6 +255,16 @@ export async function unhidePiece(slug: string) {
   await setLiveProductFlags(current.recordId, { is_hidden: false });
 }
 
+export async function reservePiece(slug: string, reserved: boolean) {
+  const session = getFloorSession();
+  if (!session) throw new Error("Sign in to reserve a piece.");
+  const current = await getOwnedPiece(slug);
+  if (!current?.recordId) throw new Error("That piece is not in your studio.");
+  const tags = current.tags.filter((tag) => tag !== "reserved" && tag !== "hidden");
+  if (reserved) tags.push("reserved");
+  await setLiveProductFlags(current.recordId, { tags });
+}
+
 export async function deletePiece(slug: string) {
   const session = getFloorSession();
   if (!session) throw new Error("Sign in to remove a piece.");

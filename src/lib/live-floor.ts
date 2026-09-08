@@ -305,9 +305,13 @@ export async function loadFloor(force = false): Promise<Floor> {
       materials,
       sizes: sizes.length ? sizes : ["M"],
       imageUrls: (row.image_urls ?? []).filter(Boolean),
-      tags: productTags(name, category, materials),
+      tags: [
+        ...productTags(name, category, materials),
+        ...((row.tags ?? []).map(String).filter((tag) => tag === "reserved" || tag === "hidden")),
+      ],
       leadTime: row.lead_time?.trim() || "Made to order · inquire",
       featured: Boolean(house?.featured) || /dinner|wedding/i.test(name),
+      reserved: (row.tags ?? []).map(String).includes("reserved"),
       listedBy: row.user_id,
       designer,
     };
