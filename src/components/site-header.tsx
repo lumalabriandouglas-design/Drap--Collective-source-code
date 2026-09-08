@@ -12,14 +12,13 @@ import { cn } from "@/lib/utils";
 
 type NavItem = {
   label: string;
-  to: "/shop" | "/ateliers" | "/journal" | "/quiz" | "/studio" | "/atelier-house" | "/desk" | "/join";
+  to: "/shop" | "/ateliers" | "/studio" | "/atelier-house" | "/desk" | "/join";
 };
 
 function navFor(role: string | null, signedIn: boolean): NavItem[] {
   const shop: NavItem[] = [
     { label: "Shop", to: "/shop" },
     { label: "Designers", to: "/ateliers" },
-    { label: "Stories", to: "/journal" },
   ];
   if (role === "admin") {
     return [
@@ -39,7 +38,7 @@ function navFor(role: string | null, signedIn: boolean): NavItem[] {
   if (signedIn) {
     return [...shop, { label: "Messages", to: "/desk" }];
   }
-  return [...shop, { label: "Style Quiz", to: "/quiz" }];
+  return shop;
 }
 
 export function SiteHeader() {

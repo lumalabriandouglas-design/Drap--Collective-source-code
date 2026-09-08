@@ -181,18 +181,9 @@ function Account() {
       </section>
 
       <section className="mt-16">
-        <div className="mb-8 flex items-end justify-between gap-4">
-          <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">Kept close</p>
-            <h2 className="mt-2 font-serif text-3xl text-charcoal-800">Saved</h2>
-          </div>
-          <Link
-            to="/quiz"
-            className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.14em] text-charcoal-400 hover:text-charcoal-800"
-          >
-            <Heart size={13} />
-            Style quiz
-          </Link>
+        <div className="mb-8">
+          <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">Kept close</p>
+          <h2 className="mt-2 font-serif text-3xl text-charcoal-800">Saved</h2>
         </div>
         {savedList.length === 0 ? (
           <RoomEmpty
