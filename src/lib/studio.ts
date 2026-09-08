@@ -47,6 +47,7 @@ function atelierFromSession(): AtelierProfile | null {
     bio: "",
     imageUrl: session.avatarUrl,
     recordId: session.profileId,
+    whatsapp: null,
   };
 }
 
@@ -78,6 +79,7 @@ async function studioFromFloor(): Promise<StudioState> {
         bio: designer.bio ?? "",
         imageUrl: designer.imageUrl || livePieces[0]?.imageUrls[0] || session.avatarUrl,
         recordId: designer.userId ?? session.profileId,
+        whatsapp: designer.whatsapp ?? null,
       }
     : session.role === "designer" || session.role === "admin" || session.brandName
       ? local
@@ -134,7 +136,7 @@ export async function getOwnedPiece(slug: string): Promise<Product | null> {
 }
 
 export async function openAtelier(opts: {
-  data: { name: string; city: string; country: string; bio: string; imageUrl?: string };
+  data: { name: string; city: string; country: string; bio: string; imageUrl?: string; whatsapp?: string };
 }) {
   const session = getFloorSession();
   if (session) {

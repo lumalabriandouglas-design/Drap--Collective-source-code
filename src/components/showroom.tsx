@@ -6,6 +6,7 @@ import { DrapeReveal } from "@/components/drape-reveal";
 import { LazyImage } from "@/components/lazy-image";
 import { Price } from "@/components/price";
 import { Button } from "@/components/ui/button";
+import { WhatsAppDoor } from "@/components/whatsapp-door";
 import type { Designer, Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -183,6 +184,14 @@ export function DesignerShowroom({
                 </Link>
               </Button>
             )}
+            {designer.whatsapp ? (
+              <WhatsAppDoor
+                house={designer.name}
+                number={designer.whatsapp}
+                piece={hero ? { name: hero.name, slug: hero.slug } : null}
+                light
+              />
+            ) : null}
           </div>
         </div>
       </section>

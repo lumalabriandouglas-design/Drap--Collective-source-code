@@ -1,6 +1,7 @@
 import { ensureFloorToken, getFloorSession, refreshFloorSession, setFloorSession, type FloorSession } from "@/lib/floor-auth";
 import { invalidateFloor, showroomSlug } from "@/lib/live-floor";
 import type { AtelierProfile, Product } from "@/lib/types";
+import { storeWhatsApp } from "@/lib/whatsapp";
 
 const SUPABASE_URL = "https://fpvbhlbqojxrgnvxpcng.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -102,6 +103,7 @@ export async function patchDesignerProfile(input: {
   country: string;
   bio: string;
   imageUrl?: string;
+  whatsapp?: string;
 }): Promise<AtelierProfile> {
   const session = sessionOrThrow();
   const name = input.name.trim();
@@ -119,9 +121,10 @@ export async function patchDesignerProfile(input: {
     role: session.role === "admin" ? "admin" : "designer",
   };
   if (mark && mark.startsWith("http")) body.profile_photo_url = mark;
+  if (input.whatsapp !== undefined) body.website = storeWhatsApp(input.whatsapp);
 
   const tryPatch = async (column: string, value: string) =>
-    rest<Array<{ id: string; brand_name: string | null; username: string | null; bio: string | null; location: string | null; profile_photo_url?: string | null }>>(
+    rest<Array<{ id: string; brand_name: string | null; username: string | null; bio: string | null; location: string | null; profile_photo_url?: string | null; website?: string | null }>>(
       `profiles?${column}=eq.${encodeURIComponent(value)}`,
       { method: "PATCH", token: session.accessToken, body: JSON.stringify(body) },
     );
@@ -160,6 +163,7 @@ export async function patchDesignerProfile(input: {
     bio: profile.bio?.trim() || bio,
     imageUrl: photo || session.avatarUrl || "",
     recordId: profile.id,
+    whatsapp: body.website || profile.website || null,
   };
 }
 
@@ -313,6 +317,7 @@ export function mapRawToStudioPiece(row: RawFloorProduct, atelier: AtelierProfil
       country: atelier.country,
       imageUrl: atelier.imageUrl || row.image_urls?.[0] || "/images/products/studio-2.jpg",
       userId: row.user_id,
+      whatsapp: atelier.whatsapp ?? null,
     },
   };
 }

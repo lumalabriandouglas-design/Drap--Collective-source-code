@@ -38,6 +38,7 @@ type RawProfile = {
   primary_materials: string[] | null;
   status: string | null;
   is_suspended: boolean | null;
+  website?: string | null;
 };
 
 export type Floor = {
@@ -222,7 +223,7 @@ export async function loadFloor(force = false): Promise<Floor> {
   const [rawProducts, rawProfiles] = await Promise.all([
     rest<RawProduct[]>("products?select=*&order=created_at.desc&limit=100"),
     rest<RawProfile[]>(
-      "profiles?select=id,user_id,role,brand_name,username,bio,location,profile_photo_url,design_philosophy,primary_materials,status,is_suspended&limit=100",
+      "profiles?select=id,user_id,role,brand_name,username,bio,location,profile_photo_url,design_philosophy,primary_materials,status,is_suspended,website&limit=100",
     ),
   ]);
 
@@ -262,6 +263,7 @@ export async function loadFloor(force = false): Promise<Floor> {
       userId: profile.id,
       authId: profile.user_id ?? profile.id,
       pieceCount: pieces.length,
+      whatsapp: profile.website?.trim() || null,
     };
   });
 

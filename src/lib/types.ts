@@ -11,6 +11,7 @@ export type Designer = {
   userId: string | null;
   authId?: string | null;
   pieceCount: number;
+  whatsapp?: string | null;
 };
 
 export type Product = {
@@ -29,7 +30,7 @@ export type Product = {
   featured: boolean;
   hidden?: boolean;
   listedBy: string | null;
-  designer: Pick<Designer, "id" | "slug" | "name" | "city" | "country" | "imageUrl" | "userId">;
+  designer: Pick<Designer, "id" | "slug" | "name" | "city" | "country" | "imageUrl" | "userId" | "whatsapp">;
 };
 
 export type Lookbook = {
@@ -72,4 +73,5 @@ export type AtelierProfile = {
   bio: string;
   imageUrl?: string | null;
   recordId?: string;
+  whatsapp?: string | null;
 };

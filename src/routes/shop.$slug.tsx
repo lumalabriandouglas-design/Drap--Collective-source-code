@@ -8,6 +8,7 @@ import { ProductGrid } from "@/components/product-card";
 import { LazyImage } from "@/components/lazy-image";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { WhatsAppDoor } from "@/components/whatsapp-door";
 import { useBag } from "@/lib/bag-store";
 import { getProduct, listRelated } from "@/lib/catalog";
 import { listWishlist, sendInquiry, toggleWishlist } from "@/lib/commerce";
@@ -248,6 +249,7 @@ function ProductPage() {
               The house holds this note. {product.designer.name} replies at the desk — it never leaves Drapé.
             </p>
             <Textarea
+              id="piece-note"
               className="mt-3 bg-white text-base"
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -256,6 +258,16 @@ function ProductPage() {
             <Button className="mt-3" variant="outline" onClick={() => void onEnquire()}>
               Send to the desk
             </Button>
+            {product.designer.whatsapp ? (
+              <div className="mt-3">
+                <WhatsAppDoor
+                  house={product.designer.name}
+                  number={product.designer.whatsapp}
+                  piece={{ name: product.name, slug: product.slug }}
+                  onDesk={() => document.getElementById("piece-note")?.focus()}
+                />
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

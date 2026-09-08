@@ -15,6 +15,7 @@ import { formatDay } from "@/lib/format";
 import { houseError } from "@/lib/errors";
 import { openAtelier, getMyStudio, uploadPiecePhoto } from "@/lib/studio";
 import { compressImage } from "@/lib/media";
+import { displayWhatsApp } from "@/lib/whatsapp";
 import { useHouseRole } from "@/lib/use-role";
 
 export const Route = createFileRoute("/account")({ component: Account });
@@ -107,6 +108,7 @@ function Account() {
           country={studio.data?.atelier?.country ?? "Uganda"}
           bio={studio.data?.atelier?.bio ?? ""}
           logo={studio.data?.atelier?.imageUrl ?? user.profileImageUrl ?? ""}
+          whatsapp={studio.data?.atelier?.whatsapp ?? ""}
         />
       ) : null}
 
@@ -262,16 +264,18 @@ function DesignerHouseCard({
   country,
   bio,
   logo,
+  whatsapp,
 }: {
   name: string;
   city: string;
   country: string;
   bio: string;
   logo: string;
+  whatsapp: string;
 }) {
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [form, setForm] = useState({ name, city, country, bio, logo });
+  const [form, setForm] = useState({ name, city, country, bio, logo, whatsapp: displayWhatsApp(whatsapp) || whatsapp });
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -283,6 +287,7 @@ function DesignerHouseCard({
         country: next.country,
         bio: next.bio,
         imageUrl: next.logo,
+        whatsapp: next.whatsapp,
       },
     });
     await queryClient.invalidateQueries({ queryKey: ["studio"] });
@@ -397,6 +402,19 @@ function DesignerHouseCard({
             onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
             className="mt-1 w-full resize-none rounded-xl border border-charcoal-100 bg-white px-3 py-2 text-sm text-charcoal-800 outline-none focus:border-gold-400"
           />
+        </label>
+        <label className="block text-xs text-charcoal-500 sm:col-span-2">
+          WhatsApp number
+          <input
+            value={form.whatsapp}
+            onChange={(e) => setForm((f) => ({ ...f, whatsapp: e.target.value }))}
+            placeholder="+256 7xx xxx xxx"
+            inputMode="tel"
+            className="mt-1 h-11 w-full rounded-xl border border-charcoal-100 bg-white px-3 text-sm text-charcoal-800 outline-none focus:border-gold-400"
+          />
+          <span className="mt-1 block text-[11px] text-charcoal-400">
+            Collectors see this on your piece. They are asked to write on Drapé first.
+          </span>
         </label>
       </div>
       <Button type="button" className="mt-6" disabled={busy || uploading} onClick={() => void save()}>
