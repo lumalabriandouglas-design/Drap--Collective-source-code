@@ -285,7 +285,6 @@ function ProductPage() {
             whatsapp={product.designer.whatsapp}
             piece={{ name: product.name, slug: product.slug, image: images[0] }}
           />
-          </div>
         </div>
       </div>
 
