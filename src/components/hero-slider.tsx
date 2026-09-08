@@ -104,7 +104,7 @@ export function HeroSlider({ products }: { products: Product[] }) {
             src={src}
             alt={`${slide.productName} by ${slide.designerName}`}
             className={cn(
-              "absolute inset-0 size-full object-cover object-top transition-opacity duration-700 ease-out",
+              "absolute inset-0 size-full object-contain object-top transition-opacity duration-700 ease-out",
               i === index ? "opacity-100" : "opacity-0",
               i === index && !reduce && "hero-kenburns",
             )}
@@ -112,11 +112,20 @@ export function HeroSlider({ products }: { products: Product[] }) {
           />
         );
       })}
-      <div className="absolute inset-0 bg-linear-to-t from-charcoal-900/80 via-charcoal-900/10 to-charcoal-900/25" />
+      <div className="absolute inset-0 bg-linear-to-t from-charcoal-900/75 via-transparent to-charcoal-900/30" />
       <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col justify-end px-4 pb-16 pt-32 sm:px-6 lg:px-8 lg:pb-24">
-        <div className="flex flex-wrap gap-3">
+        <h1 className="max-w-3xl font-serif text-5xl font-medium leading-[1.05] text-ivory-50 sm:text-6xl lg:text-7xl">
+          {current.productName}
+        </h1>
+        <p className="mt-3 text-sm uppercase tracking-[0.16em] text-ivory-100/75">
+          {current.designerName}
+          {current.city ? ` · ${current.city}` : ""}
+        </p>
+        <div className="mt-8 flex flex-wrap gap-3">
           <Button asChild size="lg" variant="light">
-            <Link to="/shop">Shop</Link>
+            <Link to="/shop/$slug" params={{ slug: current.productSlug }}>
+              The piece
+            </Link>
           </Button>
           <Button
             asChild
@@ -129,28 +138,19 @@ export function HeroSlider({ products }: { products: Product[] }) {
             </Link>
           </Button>
         </div>
-        <div className="mt-10 flex flex-wrap items-end justify-between gap-4 border-t border-ivory-50/15 pt-5">
-          <Link to="/shop/$slug" params={{ slug: current.productSlug }} className="group min-w-0">
-            <p className="truncate font-serif text-2xl text-ivory-50 group-hover:text-gold-200">{current.productName}</p>
-            <p className="mt-1 text-xs uppercase tracking-[0.12em] text-ivory-100/70">
-              {current.designerName}
-              {current.city ? ` · ${current.city}` : ""}
-            </p>
-          </Link>
-          <div className="flex items-center gap-2">
-            <button type="button" aria-label="Previous photograph" className="grid size-11 place-items-center rounded-full border border-ivory-50/30 text-ivory-50" onClick={() => go(index - 1)}>
-              <ChevronLeft size={16} />
-            </button>
-            <button type="button" aria-label={paused ? "Play slideshow" : "Pause slideshow"} className="grid size-11 place-items-center rounded-full border border-ivory-50/30 text-ivory-50" onClick={() => setPaused((v) => !v)}>
-              {paused ? <Play size={14} /> : <Pause size={14} />}
-            </button>
-            <button type="button" aria-label="Next photograph" className="grid size-11 place-items-center rounded-full border border-ivory-50/30 text-ivory-50" onClick={() => go(index + 1)}>
-              <ChevronRight size={16} />
-            </button>
-            <p className="ml-2 text-[10px] uppercase tracking-[0.16em] text-ivory-100/70">
-              {index + 1} / {total}
-            </p>
-          </div>
+        <div className="mt-10 flex flex-wrap items-center justify-end gap-2 border-t border-ivory-50/15 pt-5">
+          <button type="button" aria-label="Previous photograph" className="grid size-11 place-items-center rounded-full border border-ivory-50/30 text-ivory-50" onClick={() => go(index - 1)}>
+            <ChevronLeft size={16} />
+          </button>
+          <button type="button" aria-label={paused ? "Play slideshow" : "Pause slideshow"} className="grid size-11 place-items-center rounded-full border border-ivory-50/30 text-ivory-50" onClick={() => setPaused((v) => !v)}>
+            {paused ? <Play size={14} /> : <Pause size={14} />}
+          </button>
+          <button type="button" aria-label="Next photograph" className="grid size-11 place-items-center rounded-full border border-ivory-50/30 text-ivory-50" onClick={() => go(index + 1)}>
+            <ChevronRight size={16} />
+          </button>
+          <p className="ml-2 text-[10px] uppercase tracking-[0.16em] text-ivory-100/70">
+            {index + 1} / {total}
+          </p>
         </div>
       </div>
       <div className="absolute inset-x-0 bottom-0 h-px bg-ivory-50/10">
