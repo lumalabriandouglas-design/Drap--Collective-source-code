@@ -112,18 +112,9 @@ export function HeroSlider({ products }: { products: Product[] }) {
           />
         );
       })}
-      <div className="absolute inset-0 bg-linear-to-t from-charcoal-900 via-charcoal-900/40 to-charcoal-900/20" />
+      <div className="absolute inset-0 bg-linear-to-t from-charcoal-900/80 via-charcoal-900/10 to-charcoal-900/25" />
       <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col justify-end px-4 pb-16 pt-32 sm:px-6 lg:px-8 lg:pb-24">
-        <p className="rise-in text-[11px] font-medium uppercase tracking-[0.32em] text-gold-300">Kampala</p>
-        <h1 className="rise-in mt-4 max-w-3xl font-serif text-5xl font-medium leading-[1.05] text-ivory-50 sm:text-6xl lg:text-7xl" style={{ animationDelay: "80ms" }}>
-          Clothes with
-          <br />
-          <em className="font-normal italic">a name on them.</em>
-        </h1>
-        <p className="rise-in mt-5 max-w-md text-sm font-light leading-relaxed text-ivory-100/80 sm:text-base" style={{ animationDelay: "160ms" }}>
-          Meet the designer. Buy the piece. Write if you want it made for you.
-        </p>
-        <div className="rise-in mt-8 flex flex-wrap gap-3" style={{ animationDelay: "220ms" }}>
+        <div className="flex flex-wrap gap-3">
           <Button asChild size="lg" variant="light">
             <Link to="/shop">Shop</Link>
           </Button>
@@ -140,10 +131,10 @@ export function HeroSlider({ products }: { products: Product[] }) {
         </div>
         <div className="mt-10 flex flex-wrap items-end justify-between gap-4 border-t border-ivory-50/15 pt-5">
           <Link to="/shop/$slug" params={{ slug: current.productSlug }} className="group min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-gold-300">Now showing</p>
-            <p className="mt-1 truncate font-serif text-2xl text-ivory-50 group-hover:text-gold-200">{current.productName}</p>
-            <p className="text-xs uppercase tracking-[0.12em] text-ivory-100/70">
-              {current.designerName} · {current.city}
+            <p className="truncate font-serif text-2xl text-ivory-50 group-hover:text-gold-200">{current.productName}</p>
+            <p className="mt-1 text-xs uppercase tracking-[0.12em] text-ivory-100/70">
+              {current.designerName}
+              {current.city ? ` · ${current.city}` : ""}
             </p>
           </Link>
           <div className="flex items-center gap-2">
