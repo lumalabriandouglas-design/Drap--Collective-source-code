@@ -18,14 +18,6 @@ export function HouseOauth({
       >
         Google
       </button>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => floorStartOAuth("apple", door)}
-        className="flex h-11 items-center justify-center rounded-full bg-charcoal-800 text-sm text-ivory-50 hover:bg-charcoal-700 disabled:opacity-40"
-      >
-        Apple
-      </button>
     </div>
   );
 }
