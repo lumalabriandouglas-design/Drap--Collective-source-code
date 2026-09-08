@@ -31,8 +31,9 @@ function navFor(role: string | null, signedIn: boolean): NavItem[] {
   }
   if (role === "designer") {
     return [
-      { label: "Messages", to: "/desk" },
+      { label: "Shop", to: "/shop" },
       { label: "Studio", to: "/studio" },
+      { label: "Messages", to: "/desk" },
     ];
   }
   if (signedIn) {

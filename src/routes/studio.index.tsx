@@ -181,6 +181,11 @@ function Studio() {
             </Button>
           )}
           <Button asChild variant="outline">
+            <Link to="/s/$slug" params={{ slug: atelier.slug }}>
+              Open showroom
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
             <Link to="/desk">Collector notes</Link>
           </Button>
           <Button asChild>
@@ -189,13 +194,41 @@ function Studio() {
         </>
       }
     >
-      <section className="grid gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
+      <section id="pieces" className="mb-16">
+        <div className="mb-8 flex items-end justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">The rail</p>
+            <h2 className="mt-2 font-serif text-3xl text-charcoal-800">Your pieces</h2>
+            <p className="mt-2 max-w-xl text-sm font-light text-charcoal-500">
+              Open a listing, hide it, change photographs, or remove it. Same rail on a phone or a computer.
+            </p>
+          </div>
+          <p className="text-xs tabular-nums text-charcoal-400">
+            {livePieces.length} live · {hiddenPieces.length} hidden
+          </p>
+        </div>
+        {pieces.length === 0 ? (
+          <RoomEmpty
+            title="The rail is empty"
+            body="Your showroom is open. List a piece when you are ready — collectors will find it on the floor."
+            action={
+              <Button asChild>
+                <Link to="/studio/new">List a piece</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <StudioRail pieces={pieces} />
+        )}
+      </section>
+
+      <section className="grid gap-8 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
         <LazyImage
           src={cover}
           alt={atelier.name}
           width={900}
           eager
-          className="aspect-[4/5] rounded-2xl sm:aspect-[3/4]"
+          className="aspect-[4/5] max-h-80 rounded-2xl object-cover sm:aspect-[3/4] lg:max-h-none"
         />
         <div>
           <div className="flex flex-wrap items-center gap-3">
@@ -223,34 +256,6 @@ function Studio() {
             <ShowroomShareCard slug={atelier.slug} name={atelier.name} />
           </div>
         </div>
-      </section>
-
-      <section className="mt-16">
-        <div className="mb-8 flex items-end justify-between gap-4">
-          <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">The rail</p>
-            <h2 className="mt-2 font-serif text-3xl text-charcoal-800">Your pieces</h2>
-            <p className="mt-2 max-w-xl text-sm font-light text-charcoal-500">
-              Hide, change photographs, or remove a listing. Live Kampala pieces stay on the floor until you hide them here.
-            </p>
-          </div>
-          <p className="text-xs tabular-nums text-charcoal-400">
-            {livePieces.length} live · {hiddenPieces.length} hidden
-          </p>
-        </div>
-        {pieces.length === 0 ? (
-          <RoomEmpty
-            title="The rail is empty"
-            body="Your showroom is open. List a piece when you are ready — collectors will find it on the floor."
-            action={
-              <Button asChild>
-                <Link to="/studio/new">List a piece</Link>
-              </Button>
-            }
-          />
-        ) : (
-          <StudioRail pieces={pieces} />
-        )}
       </section>
     </HouseRoom>
   );
@@ -316,7 +321,11 @@ function StudioRail({ pieces }: { pieces: Product[] }) {
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate font-serif text-xl text-charcoal-800">{piece.name}</p>
+                <p className="truncate font-serif text-xl text-charcoal-800">
+                  <Link to="/shop/$slug" params={{ slug: piece.slug }} className="hover:text-gold-700">
+                    {piece.name}
+                  </Link>
+                </p>
                 {hidden ? (
                   <span className="rounded-full bg-charcoal-800 px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-ivory-50">
                     Hidden
@@ -332,6 +341,11 @@ function StudioRail({ pieces }: { pieces: Product[] }) {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link to="/shop/$slug" params={{ slug: piece.slug }}>
+                  Open
+                </Link>
+              </Button>
               <Button asChild variant="outline" size="sm">
                 <Link to="/studio/new" search={{ edit: piece.slug }}>
                   <Pencil size={14} />
