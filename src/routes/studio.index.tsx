@@ -259,6 +259,7 @@ function Studio() {
 function StudioRail({ pieces }: { pieces: Product[] }) {
   const client = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
+  const [pending, setPending] = useState<Product | null>(null);
 
   async function refresh() {
     await client.invalidateQueries({ queryKey: ["studio"] });
@@ -284,12 +285,14 @@ function StudioRail({ pieces }: { pieces: Product[] }) {
     }
   }
 
-  async function onDelete(piece: Product) {
-    if (!window.confirm(`Remove “${piece.name}” from the floor?`)) return;
+  async function confirmDelete() {
+    const piece = pending;
+    if (!piece) return;
     setBusy(piece.slug);
     try {
       await deletePiece(piece.slug);
-      toast.success("Removed from the floor");
+      setPending(null);
+      toast.success("Removed from the floor and the bucket");
       await refresh();
     } catch (err) {
       toast.error(houseError(err));
@@ -299,6 +302,7 @@ function StudioRail({ pieces }: { pieces: Product[] }) {
   }
 
   return (
+    <>
     <ul className="grid gap-4">
       {pieces.map((piece) => {
         const hidden = pieceIsHidden(piece);
@@ -349,7 +353,7 @@ function StudioRail({ pieces }: { pieces: Product[] }) {
                 variant="outline"
                 size="sm"
                 disabled={busy === piece.slug}
-                onClick={() => void onDelete(piece)}
+                onClick={() => setPending(piece)}
               >
                 <Trash2 size={14} />
                 Remove
@@ -359,5 +363,42 @@ function StudioRail({ pieces }: { pieces: Product[] }) {
         );
       })}
     </ul>
+    {pending ? (
+      <div className="fixed inset-0 z-[80] flex items-end justify-center bg-charcoal-900/50 p-4 sm:items-center">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="remove-piece-title"
+          className="w-full max-w-sm rounded-2xl bg-ivory-50 p-5 shadow-[0_16px_40px_rgb(0_0_0_/_0.18)]"
+        >
+          <p id="remove-piece-title" className="font-serif text-2xl text-charcoal-800">
+            Remove this piece?
+          </p>
+          <p className="mt-2 text-sm text-charcoal-600">
+            “{pending.name}” leaves the floor. Its photographs are deleted from the bucket and cannot be undone.
+          </p>
+          <div className="mt-5 grid gap-2">
+            <Button
+              type="button"
+              className="w-full bg-charcoal-800 text-ivory-50 hover:bg-charcoal-700"
+              disabled={busy === pending.slug}
+              onClick={() => void confirmDelete()}
+            >
+              {busy === pending.slug ? "Removing…" : "Yes, remove it"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={busy === pending.slug}
+              onClick={() => setPending(null)}
+            >
+              Keep it
+            </Button>
+          </div>
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }
