@@ -1,33 +1,33 @@
 import { r2Status } from "./_r2";
+import { json, pipe } from "./_http";
 
 export const config = { runtime: "nodejs" };
 
-export default function handler(
-  _req: unknown,
-  res: {
-    statusCode: number;
-    setHeader: (k: string, v: string) => void;
-    end: (body: string) => void;
-  },
-) {
-  res.statusCode = 200;
-  res.setHeader("Content-Type", "application/json");
-  res.setHeader("Cache-Control", "no-store");
+function payload() {
   try {
     const status = r2Status();
-    res.end(JSON.stringify({ ...status, preview: !status.r2 }));
+    return { ...status, preview: !status.r2 };
   } catch (err) {
-    res.end(
-      JSON.stringify({
-        r2: false,
-        account: true,
-        bucket: true,
-        keys: false,
-        publicUrl: false,
-        preview: true,
-        missing: ["R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_PUBLIC_BASE"],
-        error: err instanceof Error ? err.message : "status-failed",
-      }),
-    );
+    return {
+      r2: false,
+      account: true,
+      bucket: true,
+      keys: false,
+      publicUrl: false,
+      preview: true,
+      missing: ["R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_PUBLIC_BASE"],
+      error: err instanceof Error ? err.message : "status-failed",
+    };
   }
+}
+
+export function GET() {
+  return json(payload());
+}
+
+export default async function handler(
+  _req: Request,
+  res?: { statusCode: number; setHeader: (k: string, v: string) => void; end: (body: string) => void },
+) {
+  return pipe(_req, res, GET());
 }

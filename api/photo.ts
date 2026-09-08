@@ -1,6 +1,5 @@
 import { putR2Object, r2Status } from "./_r2";
-import { bearer, readJson, send, who } from "./_http";
-import type { IncomingMessage, ServerResponse } from "node:http";
+import { bearerFrom, json, pipe, who } from "./_http";
 
 const SUPABASE_URL = "https://fpvbhlbqojxrgnvxpcng.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -12,11 +11,20 @@ type Body = { filename?: string; mime?: string; data?: string };
 
 const BUCKETS = ["products", "product-images", "images", "avatars"];
 
+function bytesFromDataUrl(data?: string) {
+  const raw = data?.includes(",") ? data.split(",")[1] : data;
+  if (!raw) return new Uint8Array();
+  const bin = atob(raw);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
 async function putSupabase(input: {
   token: string;
   userId: string;
   mime: string;
-  bytes: Buffer;
+  bytes: Uint8Array;
 }) {
   const ext = input.mime === "image/jpeg" ? "jpg" : "webp";
   const path = `${input.userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
@@ -30,7 +38,7 @@ async function putSupabase(input: {
         "Content-Type": input.mime,
         "x-upsert": "true",
       },
-      body: new Uint8Array(input.bytes),
+      body: input.bytes,
     });
     if (res.ok) {
       return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
@@ -40,44 +48,30 @@ async function putSupabase(input: {
   throw new Error(last.slice(0, 160) || "The house could not store that photograph.");
 }
 
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
-  if (req.method === "OPTIONS") {
-    res.statusCode = 204;
-    res.end();
-    return;
+async function handle(request: Request) {
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      },
+    });
   }
-  if (req.method !== "POST") {
-    send(res, 405, { error: "Use POST." });
-    return;
-  }
+  if (request.method !== "POST") return json({ error: "Use POST." }, 405);
 
-  const token = bearer(req);
-  if (!token) {
-    send(res, 401, { error: "Sign in to store a photograph." });
-    return;
-  }
+  const token = bearerFrom(request);
+  if (!token) return json({ error: "Sign in to store a photograph." }, 401);
   const userId = await who(token);
-  if (!userId) {
-    send(res, 401, { error: "Sign in again to store a photograph." });
-    return;
-  }
+  if (!userId) return json({ error: "Sign in again to store a photograph." }, 401);
 
   try {
-    const body = await readJson<Body>(req);
+    const body = (await request.json()) as Body;
     const mime = body.mime === "image/jpeg" ? "image/jpeg" : "image/webp";
-    const raw = body.data?.includes(",") ? body.data.split(",")[1] : body.data;
-    if (!raw) {
-      send(res, 400, { error: "The photograph did not arrive." });
-      return;
-    }
-    const bytes = Buffer.from(raw, "base64");
-    if (!bytes.length) {
-      send(res, 400, { error: "The photograph did not arrive." });
-      return;
-    }
+    const bytes = bytesFromDataUrl(body.data);
+    if (!bytes.length) return json({ error: "The photograph did not arrive." }, 400);
     if (bytes.length > 1_200_000) {
-      send(res, 413, { error: "That photo is still too large after compression." });
-      return;
+      return json({ error: "That photo is still too large after compression." }, 413);
     }
 
     const status = r2Status();
@@ -86,21 +80,33 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         const url = await putR2Object({
           filename: body.filename || "piece.webp",
           mime,
-          bytes: new Uint8Array(bytes),
+          bytes,
           folder: `pieces/${userId}`,
         });
-        if (url) {
-          send(res, 200, { url, backend: "r2" });
-          return;
-        }
+        if (url) return json({ url, backend: "r2" });
       } catch {
         /* fall through to the house store */
       }
     }
 
     const url = await putSupabase({ token, userId, mime, bytes });
-    send(res, 200, { url, backend: "supabase" });
+    return json({ url, backend: "supabase" });
   } catch (err) {
-    send(res, 500, { error: err instanceof Error ? err.message : "Could not store that photograph." });
+    return json({ error: err instanceof Error ? err.message : "Could not store that photograph." }, 500);
   }
+}
+
+export function OPTIONS(request: Request) {
+  return handle(request);
+}
+
+export function POST(request: Request) {
+  return handle(request);
+}
+
+export default async function handler(
+  req: Request,
+  res?: { statusCode: number; setHeader: (k: string, v: string) => void; end: (body: string) => void },
+) {
+  return pipe(req, res, await handle(req));
 }

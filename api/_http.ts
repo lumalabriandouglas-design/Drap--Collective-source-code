@@ -1,53 +1,20 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
-
 const SUPABASE_URL = "https://fpvbhlbqojxrgnvxpcng.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdmJobGJxb2p4cmdudnhwY25nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2ODk4ODYsImV4cCI6MjA5NjI2NTg4Nn0.MHQq6Sq3xLyLxE3ZqcNW9_5k4knMKB4fp7vH7Ja-Ees";
 
-type BodyReq = IncomingMessage & { body?: unknown };
-
-export function send(res: ServerResponse, status: number, payload: unknown) {
-  res.statusCode = status;
-  res.setHeader("Content-Type", "application/json");
-  res.setHeader("Cache-Control", "no-store");
-  res.end(JSON.stringify(payload));
-}
-
-export function preflight(res: ServerResponse) {
-  res.statusCode = 204;
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.end();
-}
-
-export function readJson<T>(req: BodyReq): Promise<T> {
-  if (req.body && typeof req.body === "object") {
-    return Promise.resolve(req.body as T);
-  }
-  if (typeof req.body === "string" && req.body.trim()) {
-    try {
-      return Promise.resolve(JSON.parse(req.body) as T);
-    } catch {
-      return Promise.reject(new Error("That photograph could not be read."));
-    }
-  }
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    const finish = () => {
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}") as T);
-      } catch {
-        reject(new Error("That photograph could not be read."));
-      }
-    };
-    if (req.readableEnded) {
-      finish();
-      return;
-    }
-    req.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
-    req.on("end", finish);
-    req.on("error", reject);
+export function json(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
   });
+}
+
+export function bearerFrom(request: Request) {
+  const header = request.headers.get("authorization") || "";
+  return header.startsWith("Bearer ") ? header.slice(7) : "";
 }
 
 export async function who(token: string) {
@@ -62,7 +29,17 @@ export async function who(token: string) {
   return user.id ?? null;
 }
 
-export function bearer(req: IncomingMessage) {
-  const header = String(req.headers.authorization || "");
-  return header.startsWith("Bearer ") ? header.slice(7) : "";
+export async function pipe(
+  request: Request,
+  res?: { statusCode: number; setHeader: (k: string, v: string) => void; end: (body: string) => void },
+  out?: Response,
+) {
+  const response = out ?? json({ error: "empty" }, 500);
+  if (res && typeof res.end === "function") {
+    res.statusCode = response.status;
+    response.headers.forEach((value, key) => res.setHeader(key, value));
+    res.end(await response.text());
+    return;
+  }
+  return response;
 }
