@@ -1,5 +1,5 @@
 import { liveFloor } from "@/lib/catalog-core";
-import { getFloorSession } from "@/lib/floor-auth";
+import { ensureFloorToken, getFloorSession } from "@/lib/floor-auth";
 import {
   fetchMyRawProducts,
   insertLiveProduct,
@@ -191,7 +191,7 @@ export async function listPiece(opts: {
 }
 
 async function purgePieceMedia(urls: string[]) {
-  const session = getFloorSession();
+  const session = await ensureFloorToken().catch(() => getFloorSession());
   if (!session?.accessToken || !urls.length) return;
   try {
     await fetch("/api/photo", {
@@ -358,7 +358,7 @@ export async function uploadPiecePhoto(opts: {
   if (!opts.data.data?.startsWith("data:image")) {
     throw new Error("That file could not be stored.");
   }
-  const session = getFloorSession();
+  const session = await ensureFloorToken();
   if (!session?.accessToken) throw new Error("Sign in to store a photograph.");
 
   for (let attempt = 0; attempt < 2; attempt += 1) {

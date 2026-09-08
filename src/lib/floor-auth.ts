@@ -12,6 +12,7 @@ export type FloorRole = "client" | "designer" | "admin";
 
 export type FloorSession = {
   accessToken: string;
+  refreshToken?: string;
   userId: string;
   profileId: string;
   email: string;
@@ -24,12 +25,21 @@ export type FloorSession = {
 type AuthTokenResponse = {
   access_token?: string;
   accessToken?: string;
+  refresh_token?: string;
+  refreshToken?: string;
   user?: {
     id?: string;
     email?: string;
     user_metadata?: { full_name?: string; name?: string };
   };
-  data?: { session?: { access_token?: string; user?: AuthTokenResponse["user"] }; user?: AuthTokenResponse["user"] };
+  data?: {
+    session?: {
+      access_token?: string;
+      refresh_token?: string;
+      user?: AuthTokenResponse["user"];
+    };
+    user?: AuthTokenResponse["user"];
+  };
   error?: string;
   error_description?: string;
   error_code?: string;
@@ -77,7 +87,7 @@ function liveJoinRole(door: "client" | "designer"): "customer" | "designer" {
   return door === "designer" ? "designer" : "customer";
 }
 
-function decodeJwt(token: string): { sub?: string; email?: string } {
+function decodeJwt(token: string): { sub?: string; email?: string; exp?: number } {
   try {
     const part = token.split(".")[1];
     if (!part) return {};
@@ -86,10 +96,58 @@ function decodeJwt(token: string): { sub?: string; email?: string } {
       typeof atob === "function"
         ? atob(padded)
         : Buffer.from(part, "base64url").toString("utf8");
-    return JSON.parse(json) as { sub?: string; email?: string };
+    return JSON.parse(json) as { sub?: string; email?: string; exp?: number };
   } catch {
     return {};
   }
+}
+
+function pickRefresh(json: AuthTokenResponse, fallback?: string | null) {
+  return json.refresh_token || json.refreshToken || json.data?.session?.refresh_token || fallback || "";
+}
+
+function tokenNeedsRefresh(token: string) {
+  const exp = decodeJwt(token).exp;
+  if (!exp) return false;
+  return exp * 1000 < Date.now() + 90_000;
+}
+
+let refreshGate: Promise<FloorSession | null> | null = null;
+
+export async function refreshFloorSession(): Promise<FloorSession | null> {
+  if (refreshGate) return refreshGate;
+  refreshGate = (async () => {
+    const session = getFloorSession();
+    if (!session?.refreshToken) return null;
+    const res = await timedFetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: "POST",
+      headers: anonHeaders(),
+      body: JSON.stringify({ refresh_token: session.refreshToken }),
+    });
+    const json = await readJson(res);
+    const accessToken = json.access_token || json.accessToken || json.data?.session?.access_token;
+    if (!res.ok || !accessToken) return null;
+    const next: FloorSession = {
+      ...session,
+      accessToken,
+      refreshToken: pickRefresh(json, session.refreshToken) || session.refreshToken,
+    };
+    setFloorSession(next);
+    return next;
+  })().finally(() => {
+    refreshGate = null;
+  });
+  return refreshGate;
+}
+
+export async function ensureFloorToken(): Promise<FloorSession> {
+  const session = getFloorSession();
+  if (!session?.accessToken) throw new Error("Sign in to continue.");
+  if (!tokenNeedsRefresh(session.accessToken)) return session;
+  const next = await refreshFloorSession();
+  if (next?.accessToken) return next;
+  if (!tokenNeedsRefresh(session.accessToken)) return session;
+  throw new Error("Sign in again. Your session ended.");
 }
 
 export function getFloorSession(): FloorSession | null {
@@ -135,9 +193,14 @@ export function useFloorAuth() {
     const read = () => setSession(getFloorSession());
     window.addEventListener(EVENT, read);
     window.addEventListener("storage", read);
+    const wake = () => {
+      if (document.visibilityState === "visible") void refreshFloorSession();
+    };
+    document.addEventListener("visibilitychange", wake);
     return () => {
       window.removeEventListener(EVENT, read);
       window.removeEventListener("storage", read);
+      document.removeEventListener("visibilitychange", wake);
     };
   }, []);
 
@@ -218,7 +281,7 @@ async function userFromToken(accessToken: string): Promise<{ id?: string; email?
 async function sessionFromToken(
   accessToken: string,
   emailHint: string,
-  extras?: { displayName?: string; forceRole?: "client" | "designer" },
+  extras?: { displayName?: string; forceRole?: "client" | "designer"; refreshToken?: string },
 ): Promise<FloorSession> {
   const user = await userFromToken(accessToken);
   const jwt = decodeJwt(accessToken);
@@ -241,6 +304,7 @@ async function sessionFromToken(
     userEmail.split("@")[0];
   return {
     accessToken,
+    refreshToken: extras?.refreshToken || undefined,
     userId,
     profileId: profile?.id || userId,
     email: userEmail,
@@ -265,7 +329,7 @@ export async function authenticateFloor(email: string, password: string): Promis
       json.error_description || json.msg || json.message || json.error || "Could not sign in",
     );
   }
-  return sessionFromToken(accessToken, trimmed);
+  return sessionFromToken(accessToken, trimmed, { refreshToken: pickRefresh(json) });
 }
 
 export async function floorSignIn(email: string, password: string): Promise<FloorSession> {
@@ -314,6 +378,7 @@ export async function floorSignUp(input: {
   const session = await sessionFromToken(accessToken, trimmed, {
     displayName: username,
     forceRole: door,
+    refreshToken: pickRefresh(json),
   });
   const joined: FloorSession = {
     ...session,
@@ -369,7 +434,7 @@ export async function floorFinishOAuthFromUrl(): Promise<FloorSession | null> {
   } catch {
     /* ignore */
   }
-  const session = await sessionFromToken(accessToken, "", door ? { forceRole: door } : undefined);
+  const session = await sessionFromToken(accessToken, "", door ? { forceRole: door, refreshToken: hash.get("refresh_token") || query.get("refresh_token") || undefined } : { refreshToken: hash.get("refresh_token") || query.get("refresh_token") || undefined });
   setFloorSession(session);
   window.history.replaceState({}, "", "/login");
   return session;

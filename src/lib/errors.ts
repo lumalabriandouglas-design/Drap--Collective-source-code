@@ -3,6 +3,9 @@ export function houseError(err: unknown): string {
   const msg = raw.toLowerCase();
 
   if (msg.includes("unauthorized")) return "Please sign in to continue.";
+  if (msg.includes("jwt") || msg.includes("session ended") || (msg.includes("expired") && msg.includes("sign"))) {
+    return "Sign in again. Your session ended.";
+  }
   if (
     msg.includes("invalid login") ||
     msg.includes("invalid_credentials") ||

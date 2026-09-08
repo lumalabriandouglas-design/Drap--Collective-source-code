@@ -1,4 +1,4 @@
-import { getFloorSession, setFloorSession, type FloorSession } from "@/lib/floor-auth";
+import { ensureFloorToken, getFloorSession, refreshFloorSession, setFloorSession, type FloorSession } from "@/lib/floor-auth";
 import { invalidateFloor, showroomSlug } from "@/lib/live-floor";
 import type { AtelierProfile, Product } from "@/lib/types";
 
@@ -32,6 +32,11 @@ function sessionOrThrow(): FloorSession {
   return session;
 }
 
+function isAuthFailure(message: string) {
+  const msg = message.toLowerCase();
+  return msg.includes("jwt") || msg.includes("expired") || msg.includes("unauthorized") || msg.includes("401");
+}
+
 function headers(token: string, prefer = "return=representation"): HeadersInit {
   return {
     apikey: SUPABASE_ANON_KEY,
@@ -52,15 +57,27 @@ async function readError(res: Response) {
   }
 }
 
-async function rest<T>(path: string, init: RequestInit & { token: string }): Promise<T> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...init,
-    headers: {
-      ...headers(init.token, String((init.headers as Record<string, string> | undefined)?.Prefer ?? "return=representation")),
-      ...(init.headers as Record<string, string> | undefined),
-    },
-  });
-  if (!res.ok) throw new Error(await readError(res));
+async function rest<T>(path: string, init: RequestInit & { token?: string }): Promise<T> {
+  const live = await ensureFloorToken();
+  const token = init.token || live.accessToken;
+  const send = (bearer: string) =>
+    fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      ...init,
+      headers: {
+        ...headers(bearer, String((init.headers as Record<string, string> | undefined)?.Prefer ?? "return=representation")),
+        ...(init.headers as Record<string, string> | undefined),
+      },
+    });
+  let res = await send(token);
+  if (res.status === 401) {
+    const next = await refreshFloorSession();
+    if (next?.accessToken) res = await send(next.accessToken);
+  }
+  if (!res.ok) {
+    const message = await readError(res);
+    if (isAuthFailure(message)) throw new Error("Sign in again. Your session ended.");
+    throw new Error(message);
+  }
   const text = await res.text();
   if (!text) return [] as T;
   return JSON.parse(text) as T;
