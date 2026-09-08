@@ -146,15 +146,108 @@ async function putSupabase(token, userId, mime, bytes) {
   throw new Error(last.slice(0, 160) || "The house could not store that photograph.");
 }
 
+function r2KeyFromUrl(url, userId) {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/^\//, "");
+    const prefix = `pieces/${userId}/`;
+    if (!path.startsWith(prefix)) return null;
+    if (parsed.hostname.endsWith(".r2.dev") || parsed.hostname.includes("r2.cloudflarestorage.com")) return path;
+    const publicBase = env(["R2_PUBLIC_BASE", "R2_PUBLIC_URL", "R2_PUBLIC_DOMAIN", "VITE_R2_PUBLIC_BASE"]);
+    if (publicBase && url.startsWith(publicBase)) return path;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function supabaseObjectFromUrl(url, userId) {
+  const match = String(url).match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
+  if (!match) return null;
+  const bucket = match[1];
+  const path = decodeURIComponent(match[2]);
+  if (!path.includes(userId)) return null;
+  return { bucket, path };
+}
+
+async function deleteR2Key(key) {
+  const cfg = r2Config();
+  if (!cfg) return false;
+  const { AwsClient } = await import("aws4fetch");
+  const aws = new AwsClient({
+    accessKeyId: cfg.accessKeyId,
+    secretAccessKey: cfg.secretAccessKey,
+    service: "s3",
+    region: "auto",
+  });
+  const endpoint = `https://${cfg.accountId}.r2.cloudflarestorage.com/${cfg.bucket}/${key}`;
+  const response = await aws.fetch(endpoint, { method: "DELETE" });
+  return response.ok || response.status === 404;
+}
+
+async function deleteSupabaseObject(token, object) {
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${object.bucket}/${object.path}`, {
+    method: "DELETE",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return res.ok || res.status === 404;
+}
+
+async function purgeUrls(urls, userId, token) {
+  const removed = [];
+  for (const url of urls) {
+    const key = r2KeyFromUrl(url, userId);
+    if (key) {
+      try {
+        if (await deleteR2Key(key)) removed.push(url);
+      } catch {
+        /* keep going */
+      }
+      continue;
+    }
+    const object = supabaseObjectFromUrl(url, userId);
+    if (object) {
+      try {
+        if (await deleteSupabaseObject(token, object)) removed.push(url);
+      } catch {
+        /* keep going */
+      }
+    }
+  }
+  return removed;
+}
+
 export default async function handler(req, res) {
   try {
     if (req.method === "OPTIONS") {
       res.statusCode = 204;
+      res.setHeader("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
       res.end();
       return;
     }
+    if (req.method === "DELETE") {
+      const token = bearer(req);
+      if (!token) {
+        send(res, 401, { error: "Sign in to remove a photograph." });
+        return;
+      }
+      const userId = await who(token);
+      if (!userId) {
+        send(res, 401, { error: "Sign in again to remove a photograph." });
+        return;
+      }
+      const body = await readBody(req);
+      const urls = Array.isArray(body.urls) ? body.urls.map(String).filter(Boolean) : [];
+      const removed = await purgeUrls(urls, userId, token);
+      send(res, 200, { removed });
+      return;
+    }
     if (req.method !== "POST") {
-      send(res, 405, { error: "Use POST." });
+      send(res, 405, { error: "Use POST or DELETE." });
       return;
     }
     const token = bearer(req);

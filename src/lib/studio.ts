@@ -178,6 +178,23 @@ export async function listPiece(opts: {
   throw new Error("Sign in to list a piece.");
 }
 
+async function purgePieceMedia(urls: string[]) {
+  const session = getFloorSession();
+  if (!session?.accessToken || !urls.length) return;
+  try {
+    await fetch("/api/photo", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify({ urls }),
+    });
+  } catch {
+    /* listing still comes down even if a file lingers */
+  }
+}
+
 export async function updatePiece(opts: {
   data: {
     slug: string;
@@ -194,6 +211,8 @@ export async function updatePiece(opts: {
   if (!session) throw new Error("Sign in to edit a piece.");
   const current = await getOwnedPiece(opts.data.slug);
   if (!current?.recordId) throw new Error("That piece is not in your studio.");
+  const dropped = current.imageUrls.filter((url) => !opts.data.imageUrls.includes(url));
+  if (dropped.length) await purgePieceMedia(dropped);
   return updateLiveProduct({
     recordId: current.recordId,
     name: opts.data.name,
@@ -227,6 +246,7 @@ export async function deletePiece(slug: string) {
   if (!session) throw new Error("Sign in to remove a piece.");
   const current = await getOwnedPiece(slug);
   if (!current?.recordId) throw new Error("That piece is not in your studio.");
+  await purgePieceMedia(current.imageUrls);
   await setLiveProductFlags(current.recordId, { is_deleted: true });
 }
 
