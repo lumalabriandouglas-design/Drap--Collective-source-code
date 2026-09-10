@@ -48,6 +48,10 @@ function nameKey(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
+function idKey(value: string | null | undefined) {
+  return (value ?? "").toLowerCase().replace(/-/g, "");
+}
+
 export function matchesSlug(actual: string, wanted: string) {
   const have = actual.toLowerCase();
   const need = wanted.toLowerCase();
@@ -55,6 +59,26 @@ export function matchesSlug(actual: string, wanted: string) {
   if (have.startsWith(`${need}-`)) return true;
   const tail = need.length >= 8 ? need.slice(-8) : "";
   if (tail && have.endsWith(`-${tail}`)) return true;
+  const prefix = need.length >= 8 ? need.slice(0, 8) : "";
+  if (prefix && have.endsWith(`-${prefix}`)) return true;
+  return false;
+}
+
+function matchesHouse(designer: Designer, wanted: string) {
+  const need = wanted.toLowerCase();
+  const compact = idKey(wanted);
+  if (designer.slug.toLowerCase() === need) return true;
+  if (matchesSlug(designer.slug, wanted)) return true;
+  if (nameKey(designer.name) === nameKey(wanted)) return true;
+  const ids = [designer.userId, designer.authId].filter(Boolean) as string[];
+  for (const id of ids) {
+    const have = id.toLowerCase();
+    const bare = idKey(id);
+    if (have === need || bare === compact) return true;
+    if (compact.length >= 8 && (bare.startsWith(compact.slice(0, 8)) || compact.startsWith(bare.slice(0, 8)))) {
+      return true;
+    }
+  }
   return false;
 }
 
@@ -100,21 +124,17 @@ export function relatedOf(
 }
 
 export function designerOf(floor: Floor, slug: string) {
-  const wanted = slug.toLowerCase();
-  const listed =
-    floor.designers.find((d) => d.slug.toLowerCase() === wanted) ??
-    floor.designers.find((d) => matchesSlug(d.slug, wanted)) ??
-    floor.designers.find((d) => nameKey(d.name) === wanted) ??
-    floor.designers.find((d) => d.userId?.startsWith(wanted.slice(-8)));
+  const listed = floor.designers.find((d) => matchesHouse(d, slug));
   const pieces = floor.products.filter((p) => {
     if (listed) {
       return (
         p.designer.slug === listed.slug ||
         (listed.userId && p.designer.userId === listed.userId) ||
-        (listed.authId && p.listedBy === listed.authId)
+        (listed.authId && p.listedBy === listed.authId) ||
+        (listed.userId && p.listedBy === listed.userId)
       );
     }
-    return matchesSlug(p.designer.slug, wanted);
+    return matchesSlug(p.designer.slug, slug);
   });
   if (!listed && pieces.length === 0) return null;
   const designer: Designer = listed
