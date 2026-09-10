@@ -56,7 +56,7 @@ export function ShowroomShareCard({
     try {
       await copyShowroomLink(slug);
       setCopied(true);
-      toast.success("Showroom link copied");
+      toast.success("Link copied. Paste only this line in Instagram or TikTok.");
       window.setTimeout(() => setCopied(false), 2200);
     } catch (err) {
       toast.message(err instanceof Error ? err.message : href);
@@ -97,47 +97,32 @@ export function DesignerShowroom({
   const [active, setActive] = useState(0);
   const hero = pieces[active] ?? pieces[0];
   const shareUrl = useMemo(() => showroomHref(designer.slug), [designer.slug]);
+  const writtenBio = designer.bio?.trim() || "";
+  const houseCopy = writtenBio && !/^an independent kampala designer/i.test(writtenBio) && !writtenBio.includes("is a Kampala atelier on Drapé Collective");
 
   async function share() {
-    const payload = {
-      title: `${designer.name} — Drapé Collective`,
-      text: `The ${designer.name} showroom on Drapé Collective.`,
-      url: shareUrl,
-    };
+    try {
+      await copyShowroomLink(designer.slug);
+    } catch {
+      /* still try the sheet */
+    }
     try {
       if (navigator.share) {
-        await navigator.share(payload);
+        await navigator.share({ url: shareUrl });
         return;
       }
     } catch {
-      /* fall through to copy */
+      /* cancelled or the app refused the payload */
     }
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareUrl);
-      } else {
-        const field = document.createElement("textarea");
-        field.value = shareUrl;
-        field.setAttribute("readonly", "");
-        field.style.position = "fixed";
-        field.style.left = "-9999px";
-        document.body.appendChild(field);
-        field.select();
-        document.execCommand("copy");
-        field.remove();
-      }
-      setCopied(true);
-      toast.success("Showroom link copied");
-      window.setTimeout(() => setCopied(false), 2200);
-    } catch {
-      toast.message(shareUrl);
-    }
+    setCopied(true);
+    toast.success("Link copied. Paste only this line in Instagram or TikTok.");
+    window.setTimeout(() => setCopied(false), 2200);
   }
 
   return (
     <DrapeReveal house={designer.name}>
     <main>
-      <section className="relative min-h-[88vh] overflow-hidden bg-charcoal-900">
+      <section className="relative min-h-[72vh] overflow-hidden bg-charcoal-900 sm:min-h-[80vh]">
         {hero ? (
           <LazyImage
             src={hero.imageUrls[0] ?? designer.imageUrl}
@@ -159,8 +144,8 @@ export function DesignerShowroom({
             fit="contain"
           />
         )}
-        <div className="absolute inset-0 bg-linear-to-t from-charcoal-900 via-charcoal-900/45 to-charcoal-900/25" />
-        <div className="relative mx-auto flex min-h-[88vh] max-w-7xl flex-col justify-end px-4 pb-12 pt-28 sm:px-6 lg:px-8 lg:pb-16">
+        <div className="absolute inset-0 bg-linear-to-t from-charcoal-900 via-charcoal-900/20 to-charcoal-900/10" />
+        <div className="relative mx-auto flex min-h-[72vh] max-w-7xl flex-col justify-end px-4 pb-10 pt-28 sm:min-h-[80vh] sm:px-6 lg:px-8 lg:pb-14">
           <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-gold-300">
             <MapPin size={12} />
             {designer.city}, {designer.country}
@@ -168,9 +153,6 @@ export function DesignerShowroom({
           <h1 className="mt-3 font-serif text-5xl text-ivory-50 sm:text-6xl lg:text-7xl">
             {designer.name}
           </h1>
-          <p className="mt-4 max-w-xl text-sm font-light leading-relaxed text-ivory-100/80">
-            {designer.bio}
-          </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button type="button" variant="light" size="lg" onClick={() => void share()}>
               {copied ? <Check size={16} /> : <Share2 size={16} />}
@@ -196,6 +178,15 @@ export function DesignerShowroom({
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        {houseCopy ? (
+          <div className="mb-12 max-w-2xl">
+            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">The house</p>
+            <p className="mt-3 whitespace-pre-line font-serif text-xl leading-snug text-pretty text-charcoal-700">
+              {writtenBio}
+            </p>
+          </div>
+        ) : null}
+
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-600">
@@ -204,7 +195,7 @@ export function DesignerShowroom({
             <h2 className="mt-2 font-serif text-3xl text-charcoal-800">The collection</h2>
           </div>
           <p className="text-xs uppercase tracking-[0.14em] text-charcoal-400">
-            {pieces.length} {pieces.length === 1 ? "piece" : "pieces"} · {shareUrl.replace(/^https?:\/\//, "")}
+            {pieces.length} {pieces.length === 1 ? "piece" : "pieces"}
           </p>
         </div>
         <div className="gold-line my-8" />

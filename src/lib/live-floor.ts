@@ -56,6 +56,8 @@ const HOUSE_NAMES: Record<string, string> = {
   "ensemble fashions": "Ensemble Fashions",
   "ucj fashions": "UCJ Fashions",
   "may stitches": "May Stitches",
+  "binti dezigns": "Binti Dezigns",
+  "binti designs": "Binti Dezigns",
 };
 
 function numericId(uuid: string): number {
@@ -104,7 +106,10 @@ function designerName(profile: RawProfile): string {
     const key = brand.replace(/\s+/g, " ").toLowerCase();
     return HOUSE_NAMES[key] ?? brand.replace(/\s+/g, " ");
   }
-  if (profile.username?.trim()) return profile.username.trim();
+  if (profile.username?.trim()) {
+    const key = profile.username.replace(/\s+/g, " ").toLowerCase();
+    return HOUSE_NAMES[key] ?? profile.username.trim();
+  }
   return "Independent Designer";
 }
 
@@ -113,7 +118,7 @@ function designerBio(profile: RawProfile, name: string, city: string): string {
   if (name !== "Independent Designer") {
     return `${name} is a Kampala atelier on Drapé Collective, based at ${city}.`;
   }
-  return "An independent Kampala designer listing original pieces on Drapé Collective.";
+  return "";
 }
 
 function productTags(name: string, category: string, materials: string[]): string[] {
