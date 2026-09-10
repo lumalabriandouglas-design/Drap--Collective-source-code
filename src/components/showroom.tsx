@@ -10,13 +10,14 @@ import { WhatsAppDoor } from "@/components/whatsapp-door";
 import type { Designer, Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+const HOUSE_ORIGIN = "https://www.odrapecollective.com";
+
 export function showroomPath(slug: string) {
   return `/s/${slug}`;
 }
 
 export function showroomHref(slug: string) {
-  if (typeof window === "undefined") return showroomPath(slug);
-  return `${window.location.origin}${showroomPath(slug)}`;
+  return `${HOUSE_ORIGIN}${showroomPath(slug)}`;
 }
 
 export async function copyShowroomLink(slug: string) {
@@ -50,7 +51,6 @@ export function ShowroomShareCard({
 }) {
   const [copied, setCopied] = useState(false);
   const href = showroomHref(slug);
-  const display = href.replace(/^https?:\/\//, "");
 
   async function copy() {
     try {
@@ -70,7 +70,7 @@ export function ShowroomShareCard({
       <p className="mt-2 text-sm font-light leading-relaxed text-charcoal-500">
         Send this to your clients so they only see your work — not the whole house.
       </p>
-      <p className="mt-4 break-all text-xs tracking-wide text-charcoal-400">{display}</p>
+      <p className="mt-4 break-all text-xs tracking-wide text-charcoal-400">{href}</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button type="button" onClick={() => void copy()}>
           {copied ? <Check size={16} /> : <Share2 size={16} />}
@@ -96,10 +96,7 @@ export function DesignerShowroom({
   const [copied, setCopied] = useState(false);
   const [active, setActive] = useState(0);
   const hero = pieces[active] ?? pieces[0];
-  const shareUrl = useMemo(() => {
-    if (typeof window === "undefined") return showroomPath(designer.slug);
-    return `${window.location.origin}${showroomPath(designer.slug)}`;
-  }, [designer.slug]);
+  const shareUrl = useMemo(() => showroomHref(designer.slug), [designer.slug]);
 
   async function share() {
     const payload = {
