@@ -80,6 +80,16 @@ function titleCase(value: string) {
   return cleaned.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function prettyHouse(value: string) {
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  const key = cleaned.toLowerCase();
+  if (HOUSE_NAMES[key]) return HOUSE_NAMES[key];
+  return cleaned.replace(/\b([A-Za-z][A-Za-z']*)/g, (word) => {
+    if (word.length <= 3 && word === word.toUpperCase()) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  });
+}
+
 function mapCategory(name: string, raw: string | null): string {
   const hay = `${name} ${raw ?? ""}`.toLowerCase();
   if (hay.includes("wedding") || hay.includes("bridal")) return "Evening";
@@ -101,24 +111,13 @@ function kampalaLocation(raw: string | null): { city: string; country: string } 
 }
 
 function designerName(profile: RawProfile): string {
-  const brand = profile.brand_name?.trim();
-  if (brand) {
-    const key = brand.replace(/\s+/g, " ").toLowerCase();
-    return HOUSE_NAMES[key] ?? brand.replace(/\s+/g, " ");
-  }
-  if (profile.username?.trim()) {
-    const key = profile.username.replace(/\s+/g, " ").toLowerCase();
-    return HOUSE_NAMES[key] ?? profile.username.trim();
-  }
+  if (profile.brand_name?.trim()) return prettyHouse(profile.brand_name);
+  if (profile.username?.trim()) return prettyHouse(profile.username);
   return "Independent Designer";
 }
 
-function designerBio(profile: RawProfile, name: string, city: string): string {
-  if (profile.bio?.trim()) return profile.bio.trim();
-  if (name !== "Independent Designer") {
-    return `${name} is a Kampala atelier on Drapé Collective, based at ${city}.`;
-  }
-  return "";
+function designerBio(profile: RawProfile) {
+  return profile.bio?.trim() || "";
 }
 
 function productTags(name: string, category: string, materials: string[]): string[] {
@@ -261,7 +260,7 @@ export async function loadFloor(force = false): Promise<Floor> {
       name,
       city,
       country,
-      bio: designerBio(profile, name, city),
+      bio: designerBio(profile),
       philosophy: profile.design_philosophy?.trim() || null,
       imageUrl: cover,
       featured: Boolean(profile.brand_name?.trim()) && pieces.length > 0,
