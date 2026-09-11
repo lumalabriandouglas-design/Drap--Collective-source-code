@@ -7,6 +7,7 @@ import type { Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const INTERVAL = 5200;
+const HERO_CAP = 18;
 
 type Slide = {
   key: string;
@@ -19,11 +20,32 @@ type Slide = {
 };
 
 function flatten(products: Product[]): Slide[] {
-  const slides: Slide[] = [];
+  const byHouse = new Map<string, Product[]>();
   for (const product of products) {
-    product.imageUrls.filter(Boolean).forEach((src, i) => {
+    if (!product.imageUrls.some(Boolean)) continue;
+    const key = product.designer.slug || product.designer.userId || product.designer.name;
+    const list = byHouse.get(key) ?? [];
+    list.push(product);
+    byHouse.set(key, list);
+  }
+
+  const houses = [...byHouse.values()];
+  const slides: Slide[] = [];
+  const nextAt = houses.map(() => 0);
+  let progressed = true;
+  while (progressed) {
+    progressed = false;
+    for (let h = 0; h < houses.length; h++) {
+      const list = houses[h];
+      const i = nextAt[h];
+      if (i >= list.length) continue;
+      const product = list[i];
+      nextAt[h] += 1;
+      progressed = true;
+      const src = product.imageUrls.find(Boolean);
+      if (!src) continue;
       slides.push({
-        key: `${product.slug}-${i}`,
+        key: `${product.slug}-cover`,
         src,
         productSlug: product.slug,
         productName: product.name,
@@ -31,9 +53,9 @@ function flatten(products: Product[]): Slide[] {
         designerSlug: product.designer.slug,
         city: product.designer.city,
       });
-    });
+    }
   }
-  return slides;
+  return slides.slice(0, HERO_CAP);
 }
 
 export function HeroSlider({ products }: { products: Product[] }) {
@@ -48,7 +70,7 @@ export function HeroSlider({ products }: { products: Product[] }) {
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     setReduce(mq.matches);
-    const onChange = (e: MediaQueryListEvent) => setReduce(e.matches);
+    const onChange = (e: MediaEventListEvent) => setReduce(e.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
