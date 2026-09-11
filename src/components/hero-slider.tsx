@@ -70,7 +70,7 @@ export function HeroSlider({ products }: { products: Product[] }) {
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     setReduce(mq.matches);
-    const onChange = (e: MediaEventListEvent) => setReduce(e.matches);
+    const onChange = (e: MediaQueryListEvent) => setReduce(e.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
